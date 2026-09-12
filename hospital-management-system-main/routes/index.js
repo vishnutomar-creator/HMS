@@ -41,12 +41,14 @@ router.use("/doctors", doctorRoutes);
 
 router.use("/departments", departmentRoutes);
 
+// Patient routes now at /patients with REST paths
 router.use("/patients", patientRoutes);
 
 router.use("/", dashboardRoutes);
 
 router.use("/auth", authRoutes);
 
+// Appointment, prescription, medicalRecord routes use full paths internally
 router.use("/", appointmentRoutes);
 
 router.use("/", auditRoutes);
@@ -55,14 +57,10 @@ router.use("/", notificationRoutes);
 
 router.use("/", prescriptionRoutes);
 
-router.use("/",medicalRecordRoutes);
+router.use("/", medicalRecordRoutes);
 
 router.use("/billings", billingRoutes);
 
 router.use("/payments", paymentRoutes);
 
 module.exports = router;
-
-
-
-

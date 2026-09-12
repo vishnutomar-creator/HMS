@@ -3,122 +3,162 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { prescriptionAPI, patientAPI, medicalRecordAPI } from "../../../services/api";
+
+const FREQUENCY_OPTIONS = [
+  { value: "once_daily", label: "Once daily" },
+  { value: "twice_daily", label: "Twice daily" },
+  { value: "three_times_daily", label: "Thrice daily" },
+  { value: "four_times_daily", label: "Four times daily" },
+  { value: "as_needed", label: "As needed" },
+];
+
+const TIMING_OPTIONS = [
+  { value: "before_meal", label: "Before meal" },
+  { value: "after_meal", label: "After meal" },
+  { value: "with_meal", label: "With meal" },
+  { value: "anytime", label: "Anytime" },
+];
+
+const emptyMedicine = () => ({
+  name: "",
+  dosage: "",
+  frequency: "once_daily",
+  timing: "anytime",
+  duration: "",
+  quantity: "",
+  instructions: "",
+});
 
 export default function AddPrescriptionPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  // Patient list — stores full objects {_id, displayName}
   const [patientOptions, setPatientOptions] = useState([]);
+  // Medical record list — stores full objects {_id, label}
   const [recordOptions, setRecordOptions] = useState([]);
 
   const [form, setForm] = useState({
-    patient: "",
-    recordId: "REC-101",
-    medicineName: "",
-    dosage: "",
-    frequency: "Once daily",
-    duration: "",
-    instructions: "",
+    patientId: "",        // ObjectId — the correct key
+    patientName: "",      // display only
+    recordId: "",         // MedicalRecord._id or custom ID
+    diagnosis: "",
+    symptoms: "",
+    medicines: [emptyMedicine()],
+    advice: "",
+    followUpDate: "",
     status: "Active",
   });
 
   useEffect(() => {
-    async function loadPatientsAndRecords() {
-      let pList = [];
-      let rList = [];
-
-      if (typeof window !== "undefined") {
-        try {
-          const storedP = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          storedP.forEach((p) => {
-            const name = p.name || p.patientName || p.patient || p.userId?.name;
-            if (name && !pList.includes(name)) pList.push(name);
-          });
-
-          const storedR = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-          storedR.forEach((r) => {
-            const pName = r.patient || r.patientName || "Patient";
-            const label = `${r.recordId || r.id} · ${pName}`;
-            if (!rList.includes(label)) rList.push(label);
-          });
-        } catch (e) {}
-      }
-
+    async function loadData() {
+      // Load patients
       try {
         const resP = await patientAPI.getPatients();
         if (resP.success && Array.isArray(resP.data)) {
-          resP.data.forEach((p) => {
-            const name = p.name || p.patientName || p.patient || p.userId?.name;
-            if (name && !pList.includes(name)) pList.push(name);
-          });
+          const patients = resP.data.map((p) => ({
+            _id: p._id,
+            displayName: p.name || p.patientName || p.patientId || "Unknown",
+          }));
+          setPatientOptions(patients);
+          if (patients.length > 0) {
+            setForm((prev) => ({
+              ...prev,
+              patientId: patients[0]._id,
+              patientName: patients[0].displayName,
+            }));
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Could not load patients:", e.message);
+      }
 
+      // Load medical records
       try {
         const resR = await medicalRecordAPI.getMedicalRecords();
         if (resR.success && Array.isArray(resR.data)) {
-          resR.data.forEach((r) => {
-            const pName = r.patientName || r.patient || r.patientId?.name || "Patient";
-            const label = `${r.recordId || r._id} · ${pName}`;
-            if (!rList.includes(label)) rList.push(label);
-          });
+          const records = resR.data.map((r) => ({
+            _id: r._id,
+            label: `${r._id} · ${r.diagnosis || "Consultation"}`,
+          }));
+          setRecordOptions(records);
         }
-      } catch (e) {}
-
-      setPatientOptions(pList);
-      setRecordOptions(rList);
-
-      setForm((prev) => ({
-        ...prev,
-        patient: pList[0] || "",
-        recordId: rList[0] ? rList[0].split(" · ")[0] : "REC-101",
-      }));
+      } catch (e) {
+        console.warn("Could not load medical records:", e.message);
+      }
     }
 
-    loadPatientsAndRecords();
+    loadData();
   }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "patientId") {
+      const selected = patientOptions.find((p) => p._id === value);
+      setForm((prev) => ({
+        ...prev,
+        patientId: value,
+        patientName: selected?.displayName || "",
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleMedicineChange = (index, field, value) => {
+    setForm((prev) => {
+      const updated = [...prev.medicines];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, medicines: updated };
+    });
+  };
+
+  const addMedicine = () => {
+    setForm((prev) => ({
+      ...prev,
+      medicines: [...prev.medicines, emptyMedicine()],
+    }));
+  };
+
+  const removeMedicine = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      medicines: prev.medicines.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setSubmitError(null);
 
     const rxId = `RX-${Math.floor(1000 + Math.random() * 9000)}`;
-    const finalPatient = form.patient.trim() || "Patient";
 
-    const newRxObj = {
-      id: rxId,
+    const payload = {
       rxId,
-      recordId: form.recordId || "REC-101",
-      patient: finalPatient,
-      patientName: finalPatient,
-      medicineName: form.medicineName.trim(),
-      dosage: form.dosage.trim(),
-      frequency: form.frequency,
-      duration: form.duration.trim(),
-      instructions: form.instructions.trim(),
+      patientId: form.patientId || null,
+      patientName: form.patientName || null,
+      recordId: form.recordId || null,
+      diagnosis: form.diagnosis.trim() || "General Consultation",
+      symptoms: form.symptoms
+        ? form.symptoms.split(",").map((s) => s.trim()).filter(Boolean)
+        : [],
+      medicines: form.medicines.filter((m) => m.name.trim()),
+      advice: form.advice.trim(),
+      followUpDate: form.followUpDate || null,
       status: form.status,
     };
 
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-        localStorage.setItem("hms_local_prescriptions", JSON.stringify([newRxObj, ...stored]));
-      } catch (err) {}
-    }
-
     try {
-      await prescriptionAPI.createPrescription(newRxObj);
-    } catch (err) {
-      console.warn("Prescription API creation notice:", err.message);
-    } finally {
-      setLoading(false);
+      await prescriptionAPI.createPrescription(payload);
       router.push("/prescriptions");
+    } catch (err) {
+      setSubmitError(err.message || "Failed to create prescription. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -143,10 +183,17 @@ export default function AddPrescriptionPage() {
             Add Prescription
           </h1>
           <p className="mt-1 text-sm text-[#7B8882] dark:text-[#87938E]">
-            Prescribe a medicine for a registered patient
+            Prescribe medicines for a registered patient
           </p>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {submitError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          {submitError}
+        </div>
+      )}
 
       {/* Form Card */}
       <form
@@ -157,27 +204,39 @@ export default function AddPrescriptionPage() {
         "
       >
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {/* Patient Selection / Typeable Text Input */}
+
+          {/* Patient Selection — stores ObjectId */}
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Select or Type Patient Name *
+              Patient *
             </label>
-            <input
-              required
-              type="text"
-              name="patient"
-              value={form.patient}
-              onChange={handleChange}
-              list="rx-patient-suggestions"
-              placeholder="Type or select patient full name"
-              className={inputClass}
-            />
-            {patientOptions.length > 0 && (
-              <datalist id="rx-patient-suggestions">
-                {patientOptions.map((name) => (
-                  <option key={name} value={name} />
+            {patientOptions.length > 0 ? (
+              <select
+                required
+                name="patientId"
+                value={form.patientId}
+                onChange={handleChange}
+                className={inputClass}
+              >
+                <option value="">— Select patient —</option>
+                {patientOptions.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.displayName}
+                  </option>
                 ))}
-              </datalist>
+              </select>
+            ) : (
+              <input
+                required
+                type="text"
+                name="patientName"
+                value={form.patientName}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, patientName: e.target.value }))
+                }
+                placeholder="Type patient name"
+                className={inputClass}
+              />
             )}
           </div>
 
@@ -185,6 +244,7 @@ export default function AddPrescriptionPage() {
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
               Medical Record Reference
+              <span className="ml-1 font-normal text-[#9AA49F]">(optional)</span>
             </label>
             {recordOptions.length > 0 ? (
               <select
@@ -193,9 +253,10 @@ export default function AddPrescriptionPage() {
                 onChange={handleChange}
                 className={inputClass}
               >
-                {recordOptions.map((opt) => (
-                  <option key={opt} value={opt.split(" · ")[0]}>
-                    {opt}
+                <option value="">— Select a medical record —</option>
+                {recordOptions.map((r) => (
+                  <option key={r._id} value={r._id}>
+                    {r.label}
                   </option>
                 ))}
               </select>
@@ -205,72 +266,188 @@ export default function AddPrescriptionPage() {
                 name="recordId"
                 value={form.recordId}
                 onChange={handleChange}
-                placeholder="e.g. REC-101"
+                placeholder="Medical record ID (optional)"
                 className={inputClass}
               />
             )}
           </div>
 
-          {/* Medicine Name */}
+          {/* Diagnosis */}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
+              Diagnosis
+            </label>
+            <input
+              type="text"
+              name="diagnosis"
+              value={form.diagnosis}
+              onChange={handleChange}
+              placeholder="e.g. Hypertension, Type 2 Diabetes"
+              className={inputClass}
+            />
+          </div>
+
+          {/* Symptoms */}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
+              Symptoms
+              <span className="ml-1 font-normal text-[#9AA49F]">(comma separated)</span>
+            </label>
+            <input
+              type="text"
+              name="symptoms"
+              value={form.symptoms}
+              onChange={handleChange}
+              placeholder="e.g. headache, fever, nausea"
+              className={inputClass}
+            />
+          </div>
+
+          {/* Medicines */}
+          <div className="sm:col-span-2">
+            <div className="mb-3 flex items-center justify-between">
+              <label className="text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
+                Medicines *
+              </label>
+              <button
+                type="button"
+                onClick={addMedicine}
+                className="flex items-center gap-1.5 rounded-lg bg-[#0F766E]/10 px-3 py-1.5 text-xs font-semibold text-[#0F766E] transition hover:bg-[#0F766E]/20 dark:text-[#5EEAD4]"
+              >
+                <Plus size={13} /> Add Medicine
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {form.medicines.map((med, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-[#E5E2D9] p-4 dark:border-white/10"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#52615B] dark:text-[#AAB6B0]">
+                      Medicine {idx + 1}
+                    </span>
+                    {form.medicines.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeMedicine(idx)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Name *</label>
+                      <input
+                        required
+                        type="text"
+                        value={med.name}
+                        onChange={(e) => handleMedicineChange(idx, "name", e.target.value)}
+                        placeholder="e.g. Amlodipine 5mg"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Dosage *</label>
+                      <input
+                        required
+                        type="text"
+                        value={med.dosage}
+                        onChange={(e) => handleMedicineChange(idx, "dosage", e.target.value)}
+                        placeholder="e.g. 1 tablet"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Frequency</label>
+                      <select
+                        value={med.frequency}
+                        onChange={(e) => handleMedicineChange(idx, "frequency", e.target.value)}
+                        className={inputClass}
+                      >
+                        {FREQUENCY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Timing</label>
+                      <select
+                        value={med.timing}
+                        onChange={(e) => handleMedicineChange(idx, "timing", e.target.value)}
+                        className={inputClass}
+                      >
+                        {TIMING_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Duration *</label>
+                      <input
+                        required
+                        type="text"
+                        value={med.duration}
+                        onChange={(e) => handleMedicineChange(idx, "duration", e.target.value)}
+                        placeholder="e.g. 7 days"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={med.quantity}
+                        onChange={(e) => handleMedicineChange(idx, "quantity", e.target.value)}
+                        placeholder="e.g. 14"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs text-[#52615B] dark:text-[#AAB6B0]">Instructions</label>
+                      <input
+                        type="text"
+                        value={med.instructions}
+                        onChange={(e) => handleMedicineChange(idx, "instructions", e.target.value)}
+                        placeholder="e.g. Take with food, avoid alcohol"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Advice */}
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Medicine Name *
+              Doctor&apos;s Advice
             </label>
-            <input
-              required
-              name="medicineName"
-              value={form.medicineName}
+            <textarea
+              name="advice"
+              value={form.advice}
               onChange={handleChange}
-              placeholder="e.g. Amlodipine 5mg, Paracetamol 500mg"
+              rows={3}
+              placeholder="e.g. Rest, drink plenty of water, avoid spicy food"
               className={inputClass}
             />
           </div>
 
-          {/* Dosage */}
+          {/* Follow-up Date */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Dosage *
+              Follow-up Date
             </label>
             <input
-              required
-              name="dosage"
-              value={form.dosage}
+              type="date"
+              name="followUpDate"
+              value={form.followUpDate}
               onChange={handleChange}
-              placeholder="e.g. 1 tablet"
-              className={inputClass}
-            />
-          </div>
-
-          {/* Frequency */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Frequency
-            </label>
-            <select
-              name="frequency"
-              value={form.frequency}
-              onChange={handleChange}
-              className={inputClass}
-            >
-              <option>Once daily</option>
-              <option>Twice daily</option>
-              <option>Thrice daily</option>
-              <option>Every 8 hours</option>
-              <option>As needed</option>
-            </select>
-          </div>
-
-          {/* Duration */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Duration *
-            </label>
-            <input
-              required
-              name="duration"
-              value={form.duration}
-              onChange={handleChange}
-              placeholder="e.g. 7 days, 30 days"
               className={inputClass}
             />
           </div>
@@ -286,24 +463,10 @@ export default function AddPrescriptionPage() {
               onChange={handleChange}
               className={inputClass}
             >
-              <option>Active</option>
-              <option>Completed</option>
+              <option value="Active">Active</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
-          </div>
-
-          {/* Instructions */}
-          <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Instructions
-            </label>
-            <textarea
-              name="instructions"
-              value={form.instructions}
-              onChange={handleChange}
-              rows={3}
-              placeholder="e.g. Take after meals with water, avoid driving"
-              className={inputClass}
-            />
           </div>
         </div>
 
@@ -326,7 +489,7 @@ export default function AddPrescriptionPage() {
             className="
               flex items-center gap-2 rounded-xl bg-[#0F766E] px-5 py-2.5
               text-sm font-semibold text-white
-              transition hover:bg-[#0F766E]/90
+              transition hover:bg-[#0F766E]/90 disabled:opacity-60
             "
           >
             <Save size={16} />

@@ -2,11 +2,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/a
 
 const getAuthToken = () => {
   if (typeof window !== "undefined") {
-    return (
-      localStorage.getItem("hms_token") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken")
-    );
+    return localStorage.getItem("hms_token");
   }
   return null;
 };
@@ -25,23 +21,20 @@ async function apiFetch(endpoint, options = {}) {
 
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
-    const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      throw new Error(data.message || `Request failed with status ${response.status}`);
-    }
-
-    return data;
-  } catch (error) {
-    console.warn(`API Error [${endpoint}]:`, error.message);
+  if (!response.ok) {
+    const error = new Error(data.message || `Request failed with status ${response.status}`);
+    error.status = response.status;
     throw error;
   }
+
+  return data;
 }
 
 // ==========================================
@@ -64,9 +57,9 @@ export const authAPI = {
 };
 
 export const userAPI = {
-  getUsers: () => apiFetch("/auth/users"),
-  updateProfile: (data) =>
-    apiFetch("/auth/profile", {
+  getUsers: () => apiFetch("/users"),
+  updateProfile: (id, data) =>
+    apiFetch(`/users/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
@@ -80,23 +73,23 @@ export const dashboardAPI = {
 };
 
 // ==========================================
-// 3. PATIENTS API
+// 3. PATIENTS API  (REST — /patients)
 // ==========================================
 export const patientAPI = {
-  getPatients: () => apiFetch("/patients/getpatients"),
-  getPatientById: (id) => apiFetch(`/patients/getpatientby/${id}`),
+  getPatients: () => apiFetch("/patients"),
+  getPatientById: (id) => apiFetch(`/patients/${id}`),
   createPatient: (data) =>
-    apiFetch("/patients/createpatient", {
+    apiFetch("/patients", {
       method: "POST",
       body: JSON.stringify(data),
     }),
   updatePatient: (id, data) =>
-    apiFetch(`/patients/updatepatientby/${id}`, {
+    apiFetch(`/patients/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
   deletePatient: (id) =>
-    apiFetch(`/patients/deletepatientby/${id}`, {
+    apiFetch(`/patients/${id}`, {
       method: "DELETE",
     }),
 };
@@ -161,6 +154,11 @@ export const appointmentAPI = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+  cancelAppointment: (id, reason = "") =>
+    apiFetch(`/appointments/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: "cancelled", cancellationReason: reason }),
+    }),
   deleteAppointment: (id) =>
     apiFetch(`/appointments/${id}`, {
       method: "DELETE",
@@ -216,35 +214,25 @@ export const prescriptionAPI = {
 };
 
 // ==========================================
-// 9. BILLING API
+// 9. BILLING API  (/billings — plural)
 // ==========================================
 export const billingAPI = {
-  getBills: () => apiFetch("/billing"),
-  getBillings: () => apiFetch("/billing"), // alias
-  getBillById: (id) => apiFetch(`/billing/${id}`),
-  createBill: (data) =>
-    apiFetch("/billing", {
+  getBillings: () => apiFetch("/billings"),
+  getBillingById: (id) => apiFetch(`/billings/${id}`),
+  createBilling: (data) =>
+    apiFetch("/billings", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  createBilling: (data) =>
-    apiFetch("/billing", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }), // alias
-  updateBill: (id, data) =>
-    apiFetch(`/billing/${id}`, {
+  updateBilling: (id, data) =>
+    apiFetch(`/billings/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
-  deleteBill: (id) =>
-    apiFetch(`/billing/${id}`, {
+  deleteBilling: (id) =>
+    apiFetch(`/billings/${id}`, {
       method: "DELETE",
     }),
-  deleteBilling: (id) =>
-    apiFetch(`/billing/${id}`, {
-      method: "DELETE",
-    }), // alias
 };
 
 // ==========================================
@@ -253,7 +241,6 @@ export const billingAPI = {
 export const paymentAPI = {
   getPayments: () => apiFetch("/payments"),
   getPaymentById: (id) => apiFetch(`/payments/${id}`),
-  getPayment: (id) => apiFetch(`/payments/${id}`), // alias
   createPayment: (data) =>
     apiFetch("/payments", {
       method: "POST",
@@ -288,8 +275,6 @@ export const notificationAPI = {
 // ==========================================
 // 12. AUDIT LOGS API
 // ==========================================
-export const auditLogAPI = {
+export const auditAPI = {
   getLogs: () => apiFetch("/audit-logs"),
 };
-
-export const auditAPI = auditLogAPI;

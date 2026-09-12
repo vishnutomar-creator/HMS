@@ -1,30 +1,20 @@
 const createPrescriptionDTO = (data) => {
+  // Build the medicines array — accept explicit array or build from flat fields
+  const medicines = Array.isArray(data.medicines) && data.medicines.length > 0
+    ? data.medicines
+    : [];
+
   return {
-    rxId: data.rxId || data.id,
-    recordId: data.recordId || "REC-101",
-    patient: data.patient || data.patientName || "Patient",
-    patientName: data.patientName || data.patient || "Patient",
-    medicineName: data.medicineName || (Array.isArray(data.medicines) && data.medicines[0]?.name) || "",
-    dosage: data.dosage || (Array.isArray(data.medicines) && data.medicines[0]?.dosage) || "",
-    frequency: data.frequency || (Array.isArray(data.medicines) && data.medicines[0]?.frequency) || "Once daily",
-    duration: data.duration || (Array.isArray(data.medicines) && data.medicines[0]?.duration) || "7 days",
-    instructions: data.instructions || (Array.isArray(data.medicines) && data.medicines[0]?.instructions) || "",
+    rxId: data.rxId || undefined,
+    // recordId links to a MedicalRecord — never default to a hard-coded value
+    recordId: data.recordId || null,
     patientId: data.patientId || null,
+    patientName: data.patientName || data.patient || null,
     doctorId: data.doctorId || null,
     appointmentId: data.appointmentId || null,
     diagnosis: data.diagnosis || "General Consultation",
-    symptoms: data.symptoms || [],
-    medicines: Array.isArray(data.medicines)
-      ? data.medicines
-      : [
-          {
-            name: data.medicineName || "",
-            dosage: data.dosage || "",
-            frequency: data.frequency || "Once daily",
-            duration: data.duration || "7 days",
-            instructions: data.instructions || "",
-          },
-        ],
+    symptoms: Array.isArray(data.symptoms) ? data.symptoms : [],
+    medicines,
     advice: data.advice || "",
     followUpDate: data.followUpDate || null,
     status: data.status || "Active",
@@ -34,14 +24,8 @@ const createPrescriptionDTO = (data) => {
 const updatePrescriptionDTO = (data) => {
   const dto = {};
 
-  if (data.patient !== undefined) dto.patient = data.patient;
   if (data.patientName !== undefined) dto.patientName = data.patientName;
   if (data.recordId !== undefined) dto.recordId = data.recordId;
-  if (data.medicineName !== undefined) dto.medicineName = data.medicineName;
-  if (data.dosage !== undefined) dto.dosage = data.dosage;
-  if (data.frequency !== undefined) dto.frequency = data.frequency;
-  if (data.duration !== undefined) dto.duration = data.duration;
-  if (data.instructions !== undefined) dto.instructions = data.instructions;
   if (data.diagnosis !== undefined) dto.diagnosis = data.diagnosis;
   if (data.symptoms !== undefined) dto.symptoms = data.symptoms;
   if (data.medicines !== undefined) dto.medicines = data.medicines;

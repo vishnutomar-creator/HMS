@@ -88,6 +88,9 @@ const login = async (email, password) => {
     throw error;
   }
 
+  // Update last login timestamp
+  await authRepository.updateUser(user._id, { lastLogin: new Date() });
+
   const token = generateToken(user);
 
   return {

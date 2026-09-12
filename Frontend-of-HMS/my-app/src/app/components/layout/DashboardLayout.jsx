@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import MobileSidebar from "./MobileSidebar";
@@ -9,6 +10,30 @@ import Footer from "./Footer";
 
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    // Check for authentication token — redirect to login if missing
+    const token = localStorage.getItem("hms_token");
+    if (!token) {
+      router.replace("/login");
+    } else {
+      setAuthChecked(true);
+    }
+  }, [router]);
+
+  // Show nothing while checking auth to avoid flash of dashboard
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F4ED]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#0F766E] border-t-transparent" />
+          <p className="text-sm text-[#7B8882]">Checking session…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F7F4ED]">

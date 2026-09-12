@@ -64,53 +64,22 @@ const prescriptionSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Links to a MedicalRecord — optional but strongly recommended
     recordId: {
       type: String,
       trim: true,
-      default: "REC-101",
-    },
-
-    patient: {
-      type: String,
-      trim: true,
-    },
-
-    patientName: {
-      type: String,
-      trim: true,
-    },
-
-    medicineName: {
-      type: String,
-      trim: true,
-    },
-
-    dosage: {
-      type: String,
-      trim: true,
-    },
-
-    frequency: {
-      type: String,
-      trim: true,
-      default: "Once daily",
-    },
-
-    duration: {
-      type: String,
-      trim: true,
-    },
-
-    instructions: {
-      type: String,
-      trim: true,
-      default: "",
+      default: null,
     },
 
     patientId: {
       type: mongoose.Schema.Types.Mixed,
       required: false,
       default: null,
+    },
+
+    patientName: {
+      type: String,
+      trim: true,
     },
 
     doctorId: {
@@ -135,8 +104,9 @@ const prescriptionSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Structured medicines array — single source of truth
     medicines: {
-      type: Array,
+      type: [medicineSchema],
       default: [],
     },
 
@@ -152,6 +122,7 @@ const prescriptionSchema = new mongoose.Schema(
 
     status: {
       type: String,
+      enum: ["Active", "Completed", "Cancelled"],
       default: "Active",
     },
   },

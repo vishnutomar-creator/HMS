@@ -5,13 +5,28 @@ import Link from "next/link";
 import { Search, Plus, MoreVertical, Clock, Calendar, Trash2, Hash } from "lucide-react";
 import { appointmentAPI } from "../../services/api";
 
-const statusStyles = {
-  Scheduled:
-    "bg-[#0F766E]/10 text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]",
-  Completed:
-    "bg-[#F1F3EF] text-[#64746E] dark:bg-white/10 dark:text-[#AAB6B0]",
-  Cancelled:
-    "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400",
+// Map backend status values → display label + style
+const STATUS_MAP = {
+  pending: {
+    label: "Pending",
+    className: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+  },
+  confirmed: {
+    label: "Confirmed",
+    className: "bg-[#0F766E]/10 text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]",
+  },
+  completed: {
+    label: "Completed",
+    className: "bg-[#F1F3EF] text-[#64746E] dark:bg-white/10 dark:text-[#AAB6B0]",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400",
+  },
+  no_show: {
+    label: "No Show",
+    className: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400",
+  },
 };
 
 export default function AppointmentsPage() {
@@ -19,38 +34,31 @@ export default function AppointmentsPage() {
   const [query, setQuery] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchAppointments = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_appointments") || "[]");
-      } catch (e) {}
-    }
-
+    setError(null);
     try {
       const res = await appointmentAPI.getAppointments();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((a) => ({
-          id: a.appointmentId || a._id || a.id,
-          patient: a.patientName || a.patientId?.name || a.patient || "Patient",
-          doctor: a.doctorName || a.doctorId?.name || a.doctor || "Dr. Specialist",
-          department: a.department || a.doctorId?.department?.name || "General",
-          date: a.appointmentDate ? String(a.appointmentDate).slice(0, 10) : a.date || "Today",
-          time: a.appointmentTime || a.time || "10:00 AM",
-          status: a.status || "Scheduled",
+          id: a._id || a.id,
+          patient: a.patientId?.name || a.patientId?.patientName || "Patient",
+          doctor: a.doctorId?.name || "Dr. Specialist",
+          department: a.doctorId?.department?.name || "General",
+          date: a.appointmentDate ? String(a.appointmentDate).slice(0, 10) : "—",
+          time: a.appointmentTime || "—",
+          status: a.status || "pending",
+          token: a.token,
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.id));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.id));
-        setAppointments([...uniqueLocals, ...formatted]);
+        setAppointments(formatted);
       } else {
-        setAppointments(localItems);
+        setAppointments([]);
       }
     } catch (err) {
-      console.warn("Appointment API load notice:", err.message);
-      setAppointments(localItems);
+      setError(err.message || "Failed to load appointments");
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -60,21 +68,18 @@ export default function AppointmentsPage() {
     fetchAppointments();
   }, []);
 
+  // Cancel sets status to "cancelled" — does NOT hard-delete the record
   const handleCancel = async (id) => {
     if (!confirm("Are you sure you want to cancel this appointment?")) return;
     try {
-      await appointmentAPI.deleteAppointment(id);
+      await appointmentAPI.cancelAppointment(id, "Cancelled by staff");
+      // Optimistically update local state
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
+      );
     } catch (err) {
-      console.warn("Cancel appointment notice:", err.message);
+      alert(`Could not cancel appointment: ${err.message}`);
     } finally {
-      setAppointments((prev) => prev.filter((a) => a.id !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_appointments") || "[]");
-          const updated = stored.filter((a) => a.id !== id);
-          localStorage.setItem("hms_local_appointments", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };
@@ -111,6 +116,13 @@ export default function AppointmentsPage() {
           Book Appointment
         </Link>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          {error}
+        </div>
+      )}
 
       {/* Card */}
       <div
@@ -163,104 +175,112 @@ export default function AppointmentsPage() {
             </thead>
 
             <tbody>
-              {filtered.map((a) => (
-                <tr
-                  key={a.id}
-                  className="border-b border-[#EEECE5] last:border-0 hover:bg-[#FAFAF7] dark:border-white/5 dark:hover:bg-white/[0.03]"
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0F766E]/10 text-xs font-bold text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]">
-                        {(a.patient || "P")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
+              {filtered.map((a) => {
+                const statusInfo = STATUS_MAP[a.status] || {
+                  label: a.status,
+                  className: "bg-gray-100 text-gray-600",
+                };
+                return (
+                  <tr
+                    key={a.id}
+                    className="border-b border-[#EEECE5] last:border-0 hover:bg-[#FAFAF7] dark:border-white/5 dark:hover:bg-white/[0.03]"
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0F766E]/10 text-xs font-bold text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]">
+                          {(a.patient || "P")
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[#17201D] dark:text-white">
+                            {a.patient}
+                          </p>
+                          <p className="text-xs text-[#87938E]">{a.id}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-[#17201D] dark:text-white">
-                          {a.patient}
-                        </p>
-                        <p className="text-xs text-[#87938E]">{a.id}</p>
+                    </td>
+
+                    <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
+                      {a.doctor}
+                    </td>
+
+                    <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
+                      {a.department}
+                    </td>
+
+                    <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={13} className="text-[#8A9691]" />
+                        {a.date} · {a.time}
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
-                    {a.doctor}
-                  </td>
-
-                  <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
-                    {a.department}
-                  </td>
-
-                  <td className="px-5 py-3.5 text-[#52615B] dark:text-[#AAB6B0]">
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={13} className="text-[#8A9691]" />
-                      {a.date} · {a.time}
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${statusStyles[a.status] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {a.status}
-                      </span>
-                      {a.token && (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-[#0F766E]/10 px-2 py-0.5 text-xs font-extrabold text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]">
-                          <Hash size={11} /> {a.token}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${statusInfo.className}`}
+                        >
+                          {statusInfo.label}
                         </span>
-                      )}
-                    </div>
-                  </td>
+                        {a.token && (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-[#0F766E]/10 px-2 py-0.5 text-xs font-extrabold text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]">
+                            <Hash size={11} /> {a.token}
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
-                  <td className="px-5 py-3.5">
-                    <div className="relative flex justify-end items-center gap-2">
-                      <Link
-                        href={a.token ? `/queue/${a.id}` : `/queue`}
-                        className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[#0F766E]/20 bg-[#0F766E]/5 px-2.5 py-1 text-xs font-semibold text-[#0F766E] transition hover:bg-[#0F766E] hover:text-white dark:border-[#5EEAD4]/20 dark:bg-[#5EEAD4]/10 dark:text-[#5EEAD4]"
-                      >
-                        {a.token ? `Queue · ${a.token}` : "Queue"}
-                      </Link>
+                    <td className="px-5 py-3.5">
+                      <div className="relative flex justify-end items-center gap-2">
+                        <Link
+                          href={a.token ? `/queue/${a.id}` : `/queue`}
+                          className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[#0F766E]/20 bg-[#0F766E]/5 px-2.5 py-1 text-xs font-semibold text-[#0F766E] transition hover:bg-[#0F766E] hover:text-white dark:border-[#5EEAD4]/20 dark:bg-[#5EEAD4]/10 dark:text-[#5EEAD4]"
+                        >
+                          {a.token ? `Queue · ${a.token}` : "Queue"}
+                        </Link>
 
-                      <button
-                        onClick={() =>
-                          setOpenMenuId(openMenuId === a.id ? null : a.id)
-                        }
-                        className="rounded-lg p-2 text-[#64746E] hover:bg-[#F1F3EF] hover:text-[#0F766E] dark:text-[#AAB6B0] dark:hover:bg-white/10"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
+                        <button
+                          onClick={() =>
+                            setOpenMenuId(openMenuId === a.id ? null : a.id)
+                          }
+                          className="rounded-lg p-2 text-[#64746E] hover:bg-[#F1F3EF] hover:text-[#0F766E] dark:text-[#AAB6B0] dark:hover:bg-white/10"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
 
-                      {openMenuId === a.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setOpenMenuId(null)}
-                          />
-                          <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-[#DDD9CE] bg-white shadow-xl dark:border-white/10 dark:bg-[#202B27]">
-                            <Link
-                              href={a.token ? `/queue/${a.id}` : `/queue`}
-                              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[#17201D] hover:bg-[#FAFAF7] dark:text-white dark:hover:bg-white/5"
-                            >
-                              <Clock size={15} className="text-[#0F766E]" /> Go to OPD Queue{a.token ? ` · ${a.token}` : ""}
-                            </Link>
-                            <button
-                              onClick={() => handleCancel(a.id)}
-                              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-                            >
-                              <Trash2 size={15} /> Cancel Appointment
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {openMenuId === a.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setOpenMenuId(null)}
+                            />
+                            <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-[#DDD9CE] bg-white shadow-xl dark:border-white/10 dark:bg-[#202B27]">
+                              <Link
+                                href={a.token ? `/queue/${a.id}` : `/queue`}
+                                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[#17201D] hover:bg-[#FAFAF7] dark:text-white dark:hover:bg-white/5"
+                              >
+                                <Clock size={15} className="text-[#0F766E]" /> Go to OPD Queue{a.token ? ` · ${a.token}` : ""}
+                              </Link>
+                              {a.status !== "cancelled" && a.status !== "completed" && (
+                                <button
+                                  onClick={() => handleCancel(a.id)}
+                                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                                >
+                                  <Trash2 size={15} /> Cancel Appointment
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
-              {filtered.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -271,19 +291,28 @@ export default function AppointmentsPage() {
                         <Calendar size={24} />
                       </div>
                       <p className="text-sm font-semibold text-[#17201D] dark:text-white">
-                        {loading ? "Loading appointments..." : "No appointments scheduled"}
+                        No appointments scheduled
                       </p>
                       <p className="max-w-xs text-xs text-[#87938E]">
-                        {loading ? "Fetching schedule..." : "Book an appointment for a patient with a doctor."}
+                        Book an appointment for a patient with a doctor.
                       </p>
-                      {!loading && (
-                        <Link
-                          href="/appointments/book"
-                          className="mt-2 flex items-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0F766E]/90"
-                        >
-                          <Plus size={15} /> Book Appointment
-                        </Link>
-                      )}
+                      <Link
+                        href="/appointments/book"
+                        className="mt-2 flex items-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0F766E]/90"
+                      >
+                        <Plus size={15} /> Book Appointment
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0F766E] border-t-transparent" />
+                      <p className="text-sm text-[#87938E]">Loading appointments...</p>
                     </div>
                   </td>
                 </tr>
