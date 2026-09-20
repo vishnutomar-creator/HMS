@@ -33,25 +33,7 @@ export default function EditPrescriptionPage() {
       let pList = [];
       let rList = [];
 
-      // 1. Load options from local storage
-      if (typeof window !== "undefined") {
-        try {
-          const storedP = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          storedP.forEach((p) => {
-            const name = p.name || p.patientName || p.patient || p.userId?.name;
-            if (name && !pList.includes(name)) pList.push(name);
-          });
-
-          const storedR = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-          storedR.forEach((r) => {
-            const pName = r.patient || r.patientName || "Patient";
-            const label = `${r.recordId || r.id} · ${pName}`;
-            if (!rList.includes(label)) rList.push(label);
-          });
-        } catch (e) {}
-      }
-
-      // 2. Load options from API
+      // 1. Load options from API
       try {
         const resP = await patientAPI.getPatients();
         if (resP.success && Array.isArray(resP.data)) {
@@ -76,61 +58,37 @@ export default function EditPrescriptionPage() {
       setPatientOptions(pList);
       setRecordOptions(rList);
 
-      // 3. Load target prescription (Local first, then API fallback)
-      let targetRx = null;
-      if (typeof window !== "undefined") {
-        try {
-          const storedRx = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-          targetRx = storedRx.find(
-            (item) =>
-              item.prescriptionId === params.id ||
-              item.rxId === params.id ||
-              item.id === params.id ||
-              item._id === params.id
-          );
-        } catch (e) {}
-      }
-
+      // 2. Load target prescription from API
       try {
-        const resRx = await prescriptionAPI.getPrescriptionById(params.id);
-        if (resRx.success && resRx.data) {
-          const d = resRx.data;
+        let found = null;
+        try {
+          const resRx = await prescriptionAPI.getPrescriptionById(params.id);
+          if (resRx.success && resRx.data) found = resRx.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRx = await prescriptionAPI.getPrescriptions();
+          if (allRx.success && Array.isArray(allRx.data)) {
+            found = allRx.data.find((item) => item.rxId === params.id || item._id === params.id || item.prescriptionId === params.id);
+          }
+        }
+
+        if (found) {
+          const d = found;
           const med = Array.isArray(d.medicines) && d.medicines.length > 0 ? d.medicines[0] : {};
           setForm({
-            patient: d.patient || d.patientName || d.patientId?.name || targetRx?.patient || "",
-            recordId: d.recordId || targetRx?.recordId || "REC-101",
-            medicineName: d.medicineName || med.name || targetRx?.medicineName || "",
-            dosage: d.dosage || med.dosage || targetRx?.dosage || "",
-            frequency: d.frequency || med.frequency || targetRx?.frequency || "Once daily",
-            duration: d.duration || med.duration || targetRx?.duration || "",
-            instructions: d.instructions || med.instructions || targetRx?.instructions || "",
-            status: d.status === "completed" || d.status === "Completed" ? "Completed" : "Active",
-          });
-        } else if (targetRx) {
-          setForm({
-            patient: targetRx.patient || targetRx.patientName || "",
-            recordId: targetRx.recordId || "REC-101",
-            medicineName: targetRx.medicineName || "",
-            dosage: targetRx.dosage || "",
-            frequency: targetRx.frequency || "Once daily",
-            duration: targetRx.duration || "",
-            instructions: targetRx.instructions || "",
-            status: targetRx.status || "Active",
+            patient: d.patient || d.patientName || d.patientId?.name || "",
+            recordId: d.recordId || "REC-101",
+            medicineName: d.medicineName || med.name || "",
+            dosage: d.dosage || med.dosage || "",
+            frequency: d.frequency || med.frequency || "Once daily",
+            duration: d.duration || med.duration || "",
+            instructions: d.instructions || med.instructions || "",
+            status: d.status || "Active",
           });
         }
       } catch (err) {
-        if (targetRx) {
-          setForm({
-            patient: targetRx.patient || targetRx.patientName || "",
-            recordId: targetRx.recordId || "REC-101",
-            medicineName: targetRx.medicineName || "",
-            dosage: targetRx.dosage || "",
-            frequency: targetRx.frequency || "Once daily",
-            duration: targetRx.duration || "",
-            instructions: targetRx.instructions || "",
-            status: targetRx.status || "Active",
-          });
-        }
+        console.warn("Error loading prescription:", err.message);
       } finally {
         setFetching(false);
       }
@@ -151,9 +109,6 @@ export default function EditPrescriptionPage() {
     const finalPatient = form.patient.trim() || "Patient";
 
     const updatedRxObj = {
-      id: params.id,
-      prescriptionId: params.id,
-      rxId: params.id,
       recordId: form.recordId || "REC-101",
       patient: finalPatient,
       patientName: finalPatient,
@@ -164,18 +119,6 @@ export default function EditPrescriptionPage() {
       instructions: form.instructions.trim(),
       status: form.status,
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-        const updatedList = stored.map((p) =>
-          p.prescriptionId === params.id || p.rxId === params.id || p.id === params.id
-            ? { ...p, ...updatedRxObj }
-            : p
-        );
-        localStorage.setItem("hms_local_prescriptions", JSON.stringify(updatedList));
-      } catch (err) {}
-    }
 
     try {
       if (params?.id) {

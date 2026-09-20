@@ -24,41 +24,35 @@ export default function EditDoctorPage() {
   useEffect(() => {
     async function loadDoctor() {
       if (!params?.id) return;
-      let foundLocal = null;
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-          foundLocal = stored.find((d) => d.id === params.id || d._id === params.id);
-        } catch (e) {}
-      }
 
       try {
-        const res = await doctorAPI.getDoctorById(params.id);
-        if (res.success && res.data) {
-          const d = res.data;
+        let found = null;
+        try {
+          const res = await doctorAPI.getDoctorById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await doctorAPI.getDoctors();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find((d) => d.doctorId === params.id || d._id === params.id || d.id === params.id);
+          }
+        }
+
+        if (found) {
           setDoctor({
-            name: d.name || d.doctorName || "",
-            email: d.email || "",
-            phone: d.phone || "",
-            department: d.department?.name || d.department || "Cardiology",
-            specialization: d.specialization || "Cardiologist",
-            experience: d.experience || "5",
-            shift: d.shift || "Morning",
-            status: d.availability || d.status || "Available",
-          });
-        } else if (foundLocal) {
-          setDoctor({
-            ...foundLocal,
-            experience: String(foundLocal.experienceYears || foundLocal.experience || 5).replace(" Years", ""),
+            name: found.name || found.doctorName || "",
+            email: found.email || "",
+            phone: found.phone || "",
+            department: found.department?.name || found.department || "Cardiology",
+            specialization: found.specialization || "Cardiologist",
+            experience: String(found.experience || "5").replace(" Years", ""),
+            shift: found.shift || "Morning",
+            status: found.availability || found.status || "Available",
           });
         }
       } catch (err) {
-        if (foundLocal) {
-          setDoctor({
-            ...foundLocal,
-            experience: String(foundLocal.experienceYears || foundLocal.experience || 5).replace(" Years", ""),
-          });
-        }
+        console.warn("Load doctor error:", err.message);
       }
     }
 
@@ -69,31 +63,18 @@ export default function EditDoctorPage() {
     e.preventDefault();
     setLoading(true);
 
-    const updatedObj = {
-      id: params.id,
-      doctorId: params.id,
-      name: doctor.name,
-      doctorName: doctor.name,
-      email: doctor.email,
-      phone: doctor.phone,
-      department: doctor.department,
-      specialization: doctor.specialization,
-      experience: `${doctor.experience} Years`,
-      shift: doctor.shift,
-      status: doctor.status,
-    };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-        const updatedList = stored.map((d) => (d.id === params.id ? updatedObj : d));
-        localStorage.setItem("hms_local_doctors", JSON.stringify(updatedList));
-      } catch (e) {}
-    }
-
     try {
       if (params?.id) {
-        await doctorAPI.updateDoctor(params.id, doctor);
+        await doctorAPI.updateDoctor(params.id, {
+          name: doctor.name,
+          email: doctor.email,
+          phone: doctor.phone,
+          department: doctor.department,
+          specialization: doctor.specialization,
+          experience: Number(doctor.experience) || undefined,
+          shift: doctor.shift,
+          availability: doctor.status === "Available" ? "Available" : "Unavailable",
+        });
       }
     } catch (err) {
       console.warn("Update doctor notice:", err.message);

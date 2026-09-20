@@ -22,34 +22,36 @@ export default function EditPatientPage() {
   useEffect(() => {
     async function loadPatient() {
       if (!params?.id) return;
-      let foundLocal = null;
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          foundLocal = stored.find((p) => p.id === params.id || p._id === params.id);
-        } catch (e) {}
-      }
-
       try {
-        const res = await patientAPI.getPatientById(params.id);
-        if (res.success && res.data) {
+        let found = null;
+        try {
+          const res = await patientAPI.getPatientById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await patientAPI.getPatients();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find(
+              (p) => p.patientId === params.id || p.uhid === params.id || p._id === params.id
+            );
+          }
+        }
+
+        if (found) {
           setPatient({
-            name: res.data.name || res.data.patientName || "",
-            age: res.data.age || "",
-            gender: res.data.gender || "Male",
-            phone: res.data.phone || "",
-            email: res.data.email || "",
-            department: res.data.department || "General",
-            status: res.data.status || "Outpatient",
-            address: res.data.address || "",
+            name: found.name || found.patientName || "",
+            age: found.age || "",
+            gender: found.gender || "Male",
+            phone: found.phone || "",
+            email: found.email || "",
+            department: found.department || "General",
+            status: found.status || "Outpatient",
+            address: found.address || "",
           });
-        } else if (foundLocal) {
-          setPatient(foundLocal);
         }
       } catch (err) {
-        if (foundLocal) {
-          setPatient(foundLocal);
-        }
+        console.warn("Load patient error:", err.message);
       }
     }
     loadPatient();
@@ -59,31 +61,18 @@ export default function EditPatientPage() {
     e.preventDefault();
     setLoading(true);
 
-    const updatedObj = {
-      id: params.id,
-      patientId: params.id,
-      name: patient.name,
-      patientName: patient.name,
-      age: Number(patient.age) || 30,
-      gender: patient.gender,
-      phone: patient.phone,
-      email: patient.email,
-      department: patient.department,
-      status: patient.status,
-      address: patient.address,
-    };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-        const updatedList = stored.map((p) => (p.id === params.id ? updatedObj : p));
-        localStorage.setItem("hms_local_patients", JSON.stringify(updatedList));
-      } catch (e) {}
-    }
-
     try {
       if (params?.id) {
-        await patientAPI.updatePatient(params.id, patient);
+        await patientAPI.updatePatient(params.id, {
+          name: patient.name,
+          age: Number(patient.age) || undefined,
+          gender: patient.gender,
+          phone: patient.phone,
+          email: patient.email,
+          department: patient.department,
+          status: patient.status,
+          address: patient.address,
+        });
       }
     } catch (err) {
       console.warn("Update patient notice:", err.message);

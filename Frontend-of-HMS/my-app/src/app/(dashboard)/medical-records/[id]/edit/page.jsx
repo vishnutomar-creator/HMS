@@ -25,53 +25,47 @@ export default function EditMedicalRecordPage() {
   useEffect(() => {
     async function loadRecordAndOptions() {
       if (!params?.id) return;
-      let foundLocal = null;
-
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-          foundLocal = stored.find((r) => r.id === params.id || r.recordId === params.id || r._id === params.id);
-
-          const storedP = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          const storedD = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-          setPatientOptions(storedP.map((p) => p.name).filter(Boolean));
-          setDoctorOptions(storedD.map((d) => d.name).filter(Boolean));
-        } catch (e) {}
-      }
 
       try {
-        const res = await medicalRecordAPI.getMedicalRecordById(params.id);
-        if (res.success && res.data) {
-          const r = res.data;
+        const resP = await patientAPI.getPatients();
+        if (resP.success && Array.isArray(resP.data)) {
+          setPatientOptions(resP.data.map((p) => p.name || p.patientName).filter(Boolean));
+        }
+      } catch (e) {}
+
+      try {
+        const resD = await doctorAPI.getDoctors();
+        if (resD.success && Array.isArray(resD.data)) {
+          setDoctorOptions(resD.data.map((d) => d.name || d.doctorName).filter(Boolean));
+        }
+      } catch (e) {}
+
+      try {
+        let found = null;
+        try {
+          const res = await medicalRecordAPI.getMedicalRecordById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await medicalRecordAPI.getMedicalRecords();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find((r) => r.recordId === params.id || r._id === params.id || r.id === params.id);
+          }
+        }
+
+        if (found) {
           setForm({
-            patient: r.patientName || r.patientId?.name || r.patient || "",
-            doctor: r.doctorName || r.doctorId?.name || r.doctor || "",
-            diagnosis: r.diagnosis || "",
-            treatmentPlan: r.treatment || r.treatmentPlan || "",
-            date: r.recordDate ? String(r.recordDate).slice(0, 10) : r.date || "",
-            followUpDate: r.followUpDate ? String(r.followUpDate).slice(0, 10) : "",
-          });
-        } else if (foundLocal) {
-          setForm({
-            patient: foundLocal.patient || foundLocal.patientName || "",
-            doctor: foundLocal.doctor || foundLocal.doctorName || "",
-            diagnosis: foundLocal.diagnosis || "",
-            treatmentPlan: foundLocal.treatment || foundLocal.treatmentPlan || "",
-            date: foundLocal.date || "",
-            followUpDate: foundLocal.followUpDate || "",
+            patient: found.patientName || found.patientId?.name || found.patient || "",
+            doctor: found.doctorName || found.doctorId?.name || found.doctor || "",
+            diagnosis: found.diagnosis || "",
+            treatmentPlan: found.treatment || found.treatmentPlan || "",
+            date: found.recordDate ? String(found.recordDate).slice(0, 10) : found.date || "",
+            followUpDate: found.followUpDate ? String(found.followUpDate).slice(0, 10) : "",
           });
         }
       } catch (err) {
-        if (foundLocal) {
-          setForm({
-            patient: foundLocal.patient || foundLocal.patientName || "",
-            doctor: foundLocal.doctor || foundLocal.doctorName || "",
-            diagnosis: foundLocal.diagnosis || "",
-            treatmentPlan: foundLocal.treatment || foundLocal.treatmentPlan || "",
-            date: foundLocal.date || "",
-            followUpDate: foundLocal.followUpDate || "",
-          });
-        }
+        console.warn("Medical record load error:", err.message);
       }
     }
 
@@ -88,8 +82,6 @@ export default function EditMedicalRecordPage() {
     setLoading(true);
 
     const updatedObj = {
-      id: params.id,
-      recordId: params.id,
       patient: form.patient.trim() || "Patient",
       patientName: form.patient.trim() || "Patient",
       doctor: form.doctor.trim() || "Dr. Specialist",
@@ -100,22 +92,12 @@ export default function EditMedicalRecordPage() {
       followUpDate: form.followUpDate || null,
     };
 
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-        const updatedList = stored.map((r) =>
-          r.id === params.id || r.recordId === params.id || r._id === params.id ? updatedObj : r
-        );
-        localStorage.setItem("hms_local_medical_records", JSON.stringify(updatedList));
-      } catch (err) {}
-    }
-
     try {
       if (params?.id) {
         await medicalRecordAPI.updateMedicalRecord(params.id, updatedObj);
       }
     } catch (err) {
-      console.warn("Update medical record notice:", err.message);
+      console.warn("Medical Record API update notice:", err.message);
     } finally {
       setLoading(false);
       router.push("/medical-records");

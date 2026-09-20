@@ -13,16 +13,9 @@ export default function MedicalRecordsPage() {
 
   const fetchRecords = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await medicalRecordAPI.getMedicalRecords();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((r) => ({
           recordId: r.recordId || r._id || r.id,
           patient: r.patientName || r.patientId?.name || r.patient || "Patient",
@@ -31,16 +24,13 @@ export default function MedicalRecordsPage() {
           date: r.recordDate ? String(r.recordDate).slice(0, 10) : r.date || "Today",
           followUpDate: r.followUpDate ? String(r.followUpDate).slice(0, 10) : null,
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.recordId));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.recordId));
-        setRecords([...uniqueLocals, ...formatted]);
+        setRecords(formatted);
       } else {
-        setRecords(localItems);
+        setRecords([]);
       }
     } catch (err) {
       console.warn("Medical Records API load notice:", err.message);
-      setRecords(localItems);
+      setRecords([]);
     } finally {
       setLoading(false);
     }
@@ -58,13 +48,6 @@ export default function MedicalRecordsPage() {
       console.warn("Delete record notice:", err.message);
     } finally {
       setRecords((prev) => prev.filter((r) => r.recordId !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-          const updated = stored.filter((r) => r.recordId !== id);
-          localStorage.setItem("hms_local_medical_records", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };

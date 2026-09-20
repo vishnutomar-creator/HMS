@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Plus, MoreVertical, Pill } from "lucide-react";
+import { Search, Plus, MoreVertical, Pill, Clock, ExternalLink } from "lucide-react";
 import { prescriptionAPI } from "../../services/api";
 
 const statusStyles = {
@@ -10,6 +10,14 @@ const statusStyles = {
     "bg-[#0F766E]/10 text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]",
   Completed:
     "bg-[#F1F3EF] text-[#64746E] dark:bg-white/10 dark:text-[#AAB6B0]",
+  "Pending Dispense":
+    "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+  Dispensed:
+    "bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
+  Returned:
+    "bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400",
+  Cancelled:
+    "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400",
 };
 
 export default function PrescriptionsPage() {
@@ -20,16 +28,9 @@ export default function PrescriptionsPage() {
 
   const fetchPrescriptions = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await prescriptionAPI.getPrescriptions();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((p) => {
           const med = Array.isArray(p.medicines) && p.medicines.length > 0 ? p.medicines[0] : {};
           return {
@@ -40,21 +41,16 @@ export default function PrescriptionsPage() {
             dosage: p.dosage || med.dosage || "1 tablet",
             frequency: p.frequency || med.frequency || "Once daily",
             duration: p.duration || med.duration || "7 days",
-            status: p.status === "completed" || p.status === "Completed" ? "Completed" : "Active",
+            status: p.status || "Active",
           };
         });
-
-        const apiIds = new Set(formatted.map((item) => String(item.prescriptionId).toLowerCase()));
-        const uniqueLocals = localItems.filter(
-          (item) => !apiIds.has(String(item.prescriptionId || item.id || item.rxId).toLowerCase())
-        );
-        setPrescriptions([...uniqueLocals, ...formatted]);
+        setPrescriptions(formatted);
       } else {
-        setPrescriptions(localItems);
+        setPrescriptions([]);
       }
     } catch (err) {
       console.warn("Prescriptions API load notice:", err.message);
-      setPrescriptions(localItems);
+      setPrescriptions([]);
     } finally {
       setLoading(false);
     }
@@ -72,13 +68,6 @@ export default function PrescriptionsPage() {
       console.warn("Delete prescription notice:", err.message);
     } finally {
       setPrescriptions((prev) => prev.filter((p) => p.prescriptionId !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-          const updated = stored.filter((p) => p.prescriptionId !== id);
-          localStorage.setItem("hms_local_prescriptions", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };
@@ -88,6 +77,10 @@ export default function PrescriptionsPage() {
       .toLowerCase()
       .includes(query.toLowerCase())
   );
+
+  const pendingCount = prescriptions.filter(
+    (p) => String(p.status).toLowerCase().includes("pending")
+  ).length;
 
   return (
     <div className="space-y-5">
@@ -115,6 +108,32 @@ export default function PrescriptionsPage() {
           Add Prescription
         </Link>
       </div>
+
+      {/* Pending Dispense Banner */}
+      {pendingCount > 0 && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                {pendingCount} prescription{pendingCount > 1 ? "s" : ""} awaiting pharmacy dispense
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700/70 dark:text-amber-400/70">
+                These have been sent to the Pharmacy Pending Queue automatically
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/pharmacy"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700"
+          >
+            <ExternalLink size={13} />
+            View Queue
+          </Link>
+        </div>
+      )}
 
       {/* Card */}
       <div
@@ -213,10 +232,20 @@ export default function PrescriptionsPage() {
 
                   <td className="px-5 py-3.5">
                     <span
-                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${statusStyles[p.status]}`}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                        statusStyles[p.status] || statusStyles["Active"]
+                      }`}
                     >
                       {p.status}
                     </span>
+                    {String(p.status).toLowerCase().includes("pending") && (
+                      <Link
+                        href="/pharmacy"
+                        className="ml-2 text-[10px] font-bold text-amber-600 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+                      >
+                        → Pharmacy
+                      </Link>
+                    )}
                   </td>
 
                   <td className="px-5 py-3.5">

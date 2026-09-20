@@ -26,18 +26,6 @@ export default function AddMedicalRecordPage() {
       let pList = [];
       let dList = [];
 
-      if (typeof window !== "undefined") {
-        try {
-          const storedP = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          storedP.forEach((p) => {
-            const name = p.name || p.patientName || p.patient || p.userId?.name;
-            if (name && !pList.includes(name)) pList.push(name);
-          });
-          const storedD = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-          storedD.forEach((d) => d.name && !dList.includes(d.name) && dList.push(d.name));
-        } catch (e) {}
-      }
-
       try {
         const resP = await patientAPI.getPatients();
         if (resP.success && Array.isArray(resP.data)) {
@@ -74,9 +62,9 @@ export default function AddMedicalRecordPage() {
     e.preventDefault();
     setLoading(true);
 
-    const recordId = `REC-${Math.floor(1000 + Math.random() * 9000)}`;
+    const recordId = `REC-${Math.floor(100 + Math.random() * 900)}`;
+
     const newRecordObj = {
-      id: recordId,
       recordId,
       patient: form.patient.trim() || "Patient",
       patientName: form.patient.trim() || "Patient",
@@ -87,13 +75,6 @@ export default function AddMedicalRecordPage() {
       date: form.date || "Today",
       followUpDate: form.followUpDate || null,
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_medical_records") || "[]");
-        localStorage.setItem("hms_local_medical_records", JSON.stringify([newRecordObj, ...stored]));
-      } catch (err) {}
-    }
 
     try {
       await medicalRecordAPI.createMedicalRecord(newRecordObj);

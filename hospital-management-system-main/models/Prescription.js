@@ -122,9 +122,31 @@ const prescriptionSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Active", "Completed", "Cancelled"],
-      default: "Active",
+      enum: ["Active", "Pending Dispense", "Dispensed", "Returned", "Completed", "Cancelled"],
+      default: "Pending Dispense",
     },
+
+    dispensedAt: {
+      type: Date,
+      default: null,
+    },
+
+    dispensedBy: {
+      type: String,
+      default: null,
+    },
+
+    returnHistory: [
+      {
+        returnedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        medicineName: String,
+        quantity: Number,
+        reason: String,
+      },
+    ],
   },
   {
     timestamps: true,

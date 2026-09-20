@@ -45,28 +45,20 @@ export default function AddDoctorPage() {
     e.preventDefault();
     setLoading(true);
 
-    const doctorId = `DOC-${Math.floor(100 + Math.random() * 900)}`;
-    const fullName = `Dr. ${form.firstName} ${form.lastName}`.trim();
-
     const newDoctorObj = {
-      id: doctorId,
       doctorId,
       name: fullName,
-      doctorName: fullName,
       email: form.email,
       phone: form.phone,
+      gender: form.gender || "Male",
       department: form.department,
       specialization: form.specialization,
-      status: form.status,
-      experienceYears: Number(form.experience) || 5,
+      qualification: "MBBS, MD",
+      experience: Number(form.experience) || 5,
+      registrationNumber: form.licenseNumber || `REG-${Math.floor(10000 + Math.random() * 90000)}`,
+      availability: form.status === "Available" ? "Available" : "Unavailable",
+      shift: form.shift,
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-        localStorage.setItem("hms_local_doctors", JSON.stringify([newDoctorObj, ...stored]));
-      } catch (err) {}
-    }
 
     try {
       await doctorAPI.createDoctor(newDoctorObj);

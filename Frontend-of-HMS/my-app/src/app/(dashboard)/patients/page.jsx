@@ -51,66 +51,33 @@ export default function PatientsPage() {
   const [loading,     setLoading]     = useState(true);
 
   // ---------------------------------------------------------------------------
-  // Data fetching — merges API + localStorage, deduplicates
+  // Data fetching — directly from MongoDB via patientAPI
   // ---------------------------------------------------------------------------
   const fetchPatients = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-      } catch { /* ignore */ }
-    }
-
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-      const token = localStorage.getItem("hms_token") || localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
-      const resp = await fetch(`${API_BASE}/patients/getpatients`, {
-        cache: "no-store",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-
-      if (resp.ok) {
-        const json = await resp.json();
-        const raw = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-
-        const formatted = raw.map((p) => ({
+      const res = await patientAPI.getPatients();
+      if (res.success && Array.isArray(res.data)) {
+        const formatted = res.data.map((p) => ({
           id:         p.patientId || p._id || p.id,
-          uhid:       p.uhid || p.patientId || p._id,
+          uhid:       p.patientId || p.uhid || p._id,
           name:       p.name || p.patientName || p.userId?.name || "Patient",
           age:        p.age || 30,
           gender:     p.gender || "Other",
-          phone:      p.phone || p.contactNumber || "+91 98765 43210",
-          email:      p.email || p.userId?.email || "patient@example.com",
-          department: p.department || p.departmentName || "General",
+          phone:      p.phone || p.contactNumber || "—",
+          email:      p.email || p.userId?.email || "—",
+          department: p.department || p.departmentName || "General Medicine",
           status:     p.status || "Outpatient",
-          bloodGroup: p.bloodGroup || "",
-          _source:    "api",
+          bloodGroup: p.bloodGroup || "—",
+          _id:        p._id,
         }));
-
-        // Deduplicate: API patients win; only add local ones not already in API (by id OR by name+phone)
-        const apiIds   = new Set(formatted.map((p) => String(p.id).toLowerCase()));
-        const apiNames = new Set(formatted.map((p) => String(p.name).toLowerCase()));
-
-        const uniqueLocals = localItems
-          .filter((p) => {
-            const localId   = String(p.id || p.uhid || "").toLowerCase();
-            const localName = String(p.name || "").toLowerCase();
-            // Skip if same id exists in API results
-            if (localId && apiIds.has(localId)) return false;
-            // Skip if same name already in API (same patient registered from both sides)
-            if (localName && apiNames.has(localName)) return false;
-            return true;
-          })
-          .map((p) => ({ ...p, _source: "local" }));
-
-        setPatients([...formatted, ...uniqueLocals]);
+        setPatients(formatted);
       } else {
-        // API returned error — show localStorage only
-        setPatients(localItems.map((p) => ({ ...p, _source: "local" })));
+        setPatients([]);
       }
-    } catch {
-      setPatients(localItems.map((p) => ({ ...p, _source: "local" })));
+    } catch (err) {
+      console.error("Failed to load patients from backend:", err);
+      setPatients([]);
     } finally {
       setLoading(false);
     }
@@ -132,15 +99,12 @@ export default function PatientsPage() {
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this patient record?")) return;
-    try { await patientAPI.deletePatient(id); } catch { /* ignore */ }
-    setPatients((prev) => prev.filter((p) => p.id !== id));
     try {
-      const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-      localStorage.setItem(
-        "hms_local_patients",
-        JSON.stringify(stored.filter((p) => p.id !== id))
-      );
-    } catch { /* ignore */ }
+      await patientAPI.deletePatient(id);
+      setPatients((prev) => prev.filter((p) => p.id !== id && p._id !== id));
+    } catch (err) {
+      alert(err.message || "Failed to delete patient from database");
+    }
     setOpenMenuId(null);
   };
 

@@ -19,16 +19,9 @@ export default function BillingPage() {
 
   const fetchBillings = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await billingAPI.getBillings();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((b) => ({
           billId: b.billId || b._id || b.id,
           patient: b.patientName || b.patientId?.name || b.patient || "Patient",
@@ -36,16 +29,13 @@ export default function BillingPage() {
           totalAmount: b.totalAmount || 10000,
           paymentStatus: b.paymentStatus || "Pending",
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.billId));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.billId));
-        setBills([...uniqueLocals, ...formatted]);
+        setBills(formatted);
       } else {
-        setBills(localItems);
+        setBills([]);
       }
     } catch (err) {
       console.warn("Billing API load notice:", err.message);
-      setBills(localItems);
+      setBills([]);
     } finally {
       setLoading(false);
     }
@@ -63,13 +53,6 @@ export default function BillingPage() {
       console.warn("Delete bill notice:", err.message);
     } finally {
       setBills((prev) => prev.filter((b) => b.billId !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-          const updated = stored.filter((b) => b.billId !== id);
-          localStorage.setItem("hms_local_billings", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };

@@ -10,6 +10,7 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   CreditCard,
   FileBarChart,
@@ -120,6 +121,11 @@ const menuGroups = [
         label: "Nurses",
         href: "/nurses",
         icon: HeartPulse,
+      },
+      {
+        label: "Nursing Station",
+        href: "/nursing",
+        icon: ClipboardCheck,
       },
       {
         label: "Departments",

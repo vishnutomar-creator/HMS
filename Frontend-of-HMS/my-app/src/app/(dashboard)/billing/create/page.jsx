@@ -24,16 +24,6 @@ export default function CreateBillPage() {
     async function loadPatientSuggestions() {
       let pList = ["Aditi Sharma", "Rohan Verma", "Meera Nair", "Karan Malhotra", "Sneha Patil"];
 
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-          stored.forEach((p) => {
-            const name = p.name || p.patientName || p.patient || p.userId?.name;
-            if (name && !pList.includes(name)) pList.push(name);
-          });
-        } catch (e) {}
-      }
-
       try {
         const res = await patientAPI.getPatients();
         if (res.success && Array.isArray(res.data)) {
@@ -84,13 +74,6 @@ export default function CreateBillPage() {
       balance: form.paymentStatus === "Paid" ? 0 : totalAmount,
       paymentStatus: form.paymentStatus,
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-        localStorage.setItem("hms_local_billings", JSON.stringify([newBillObj, ...stored]));
-      } catch (err) {}
-    }
 
     try {
       await billingAPI.createBilling(newBillObj);

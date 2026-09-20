@@ -25,18 +25,23 @@ export default function DoctorDetailsPage() {
   useEffect(() => {
     async function loadDoctor() {
       if (!params?.id) return;
-      let foundLocal = null;
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-          foundLocal = stored.find((d) => d.id === params.id || d._id === params.id);
-        } catch (e) {}
-      }
 
       try {
-        const res = await doctorAPI.getDoctorById(params.id);
-        if (res.success && res.data) {
-          const d = res.data;
+        let found = null;
+        try {
+          const res = await doctorAPI.getDoctorById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await doctorAPI.getDoctors();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find((d) => d.doctorId === params.id || d._id === params.id || d.id === params.id);
+          }
+        }
+
+        if (found) {
+          const d = found;
           setDoctor({
             id: d.doctorId || d._id || params.id,
             name: d.name || d.doctorName || "Dr. Specialist",
@@ -48,25 +53,9 @@ export default function DoctorDetailsPage() {
             shift: d.shift || "Morning",
             status: d.availability || d.status || "Available",
           });
-        } else if (foundLocal) {
-          setDoctor(foundLocal);
         }
       } catch (err) {
-        if (foundLocal) {
-          setDoctor(foundLocal);
-        } else {
-          setDoctor({
-            id: params.id,
-            name: "Dr. Medical Specialist",
-            specialization: "Specialist Physician",
-            department: "General Medicine",
-            experience: "10 Years",
-            phone: "+91 98765 43210",
-            email: "doctor@medicare.com",
-            shift: "Morning",
-            status: "Available",
-          });
-        }
+        console.warn("Doctor load error:", err.message);
       } finally {
         setLoading(false);
       }

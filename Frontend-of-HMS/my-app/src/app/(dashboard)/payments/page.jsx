@@ -20,16 +20,9 @@ export default function PaymentsPage() {
 
   const fetchPayments = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_payments") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await paymentAPI.getPayments();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((p) => ({
           paymentId: p.paymentId || p._id || p.id,
           billId: p.billingId?._id || p.billId || "BILL-501",
@@ -38,16 +31,13 @@ export default function PaymentsPage() {
           method: p.paymentMethod || p.method || "UPI",
           date: p.createdAt ? String(p.createdAt).slice(0, 10) : p.date || "Today",
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.paymentId));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.paymentId));
-        setPayments([...uniqueLocals, ...formatted]);
+        setPayments(formatted);
       } else {
-        setPayments(localItems);
+        setPayments([]);
       }
     } catch (err) {
       console.warn("Payment API load notice:", err.message);
-      setPayments(localItems);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -65,13 +55,6 @@ export default function PaymentsPage() {
       console.warn("Delete payment notice:", err.message);
     } finally {
       setPayments((prev) => prev.filter((p) => p.paymentId !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_payments") || "[]");
-          const updated = stored.filter((p) => p.paymentId !== id);
-          localStorage.setItem("hms_local_payments", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };

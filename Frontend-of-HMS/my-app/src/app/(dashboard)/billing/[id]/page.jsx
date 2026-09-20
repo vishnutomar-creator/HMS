@@ -22,63 +22,41 @@ export default function BillDetailPage() {
       if (!params?.id) return;
       setLoading(true);
 
-      let localFound = null;
-
-      // 1. Check local storage
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-          localFound = stored.find(
-            (b) =>
-              b.billId === params.id ||
-              b.id === params.id ||
-              b._id === params.id ||
-              String(b.billId).toLowerCase() === String(params.id).toLowerCase()
-          );
-        } catch (e) {}
-      }
-
-      // 2. Try fetching from backend API
       try {
-        const res = await billingAPI.getBillById(params.id);
-        if (res.success && res.data) {
-          const d = res.data;
-          const dDoc = d.doctorCharge !== undefined ? Number(d.doctorCharge) : (localFound?.doctorCharge !== undefined ? Number(localFound.doctorCharge) : 1500);
-          const dRoom = d.roomCharge !== undefined ? Number(d.roomCharge) : (localFound?.roomCharge !== undefined ? Number(localFound.roomCharge) : 4000);
-          const dMed = d.medicineCharge !== undefined ? Number(d.medicineCharge) : (localFound?.medicineCharge !== undefined ? Number(localFound.medicineCharge) : 2000);
-          const dLab = d.labCharge !== undefined ? Number(d.labCharge) : (localFound?.labCharge !== undefined ? Number(localFound.labCharge) : 1500);
+        let found = null;
+        try {
+          const res = await billingAPI.getBillingById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await billingAPI.getBillings();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find(
+              (b) => b.billId === params.id || b.id === params.id || b._id === params.id || String(b.billId).toLowerCase() === String(params.id).toLowerCase()
+            );
+          }
+        }
+
+        if (found) {
+          const d = found;
+          const dDoc = Number(d.doctorCharge) || 1500;
+          const dRoom = Number(d.roomCharge) || 4000;
+          const dMed = Number(d.medicineCharge) || 2000;
+          const dLab = Number(d.labCharge) || 1500;
           const sum = dDoc + dRoom + dMed + dLab;
           const dTotal = sum > 0 ? sum : (Number(d.totalAmount) || 9000);
 
           setBill({
             billId: d.billId || d._id || d.id || params.id,
-            patient: d.patientName || d.patient || d.patientId?.name || localFound?.patient || "Patient",
+            patient: d.patientName || d.patient || d.patientId?.name || "Patient",
             billDate: d.billDate || d.date || (d.createdAt ? String(d.createdAt).slice(0, 10) : "Today"),
             doctorCharge: dDoc,
             roomCharge: dRoom,
             medicineCharge: dMed,
             labCharge: dLab,
             totalAmount: dTotal,
-            paymentStatus: d.paymentStatus || d.status || localFound?.paymentStatus || "Pending",
-          });
-        } else if (localFound) {
-          const dDoc = Number(localFound.doctorCharge) || 1500;
-          const dRoom = Number(localFound.roomCharge) || 4000;
-          const dMed = Number(localFound.medicineCharge) || 2000;
-          const dLab = Number(localFound.labCharge) || 1500;
-          const sum = dDoc + dRoom + dMed + dLab;
-          const dTotal = sum > 0 ? sum : (Number(localFound.totalAmount) || 9000);
-
-          setBill({
-            billId: localFound.billId || localFound.id || params.id,
-            patient: localFound.patient || "Patient",
-            billDate: localFound.billDate || localFound.date || "Today",
-            doctorCharge: dDoc,
-            roomCharge: dRoom,
-            medicineCharge: dMed,
-            labCharge: dLab,
-            totalAmount: dTotal,
-            paymentStatus: localFound.paymentStatus || "Pending",
+            paymentStatus: d.paymentStatus || d.status || "Pending",
           });
         } else {
           setBill({
@@ -94,38 +72,7 @@ export default function BillDetailPage() {
           });
         }
       } catch (err) {
-        if (localFound) {
-          const dDoc = Number(localFound.doctorCharge) || 1500;
-          const dRoom = Number(localFound.roomCharge) || 4000;
-          const dMed = Number(localFound.medicineCharge) || 2000;
-          const dLab = Number(localFound.labCharge) || 1500;
-          const sum = dDoc + dRoom + dMed + dLab;
-          const dTotal = sum > 0 ? sum : (Number(localFound.totalAmount) || 9000);
-
-          setBill({
-            billId: localFound.billId || localFound.id || params.id,
-            patient: localFound.patient || "Patient",
-            billDate: localFound.billDate || localFound.date || "Today",
-            doctorCharge: dDoc,
-            roomCharge: dRoom,
-            medicineCharge: dMed,
-            labCharge: dLab,
-            totalAmount: dTotal,
-            paymentStatus: localFound.paymentStatus || "Pending",
-          });
-        } else {
-          setBill({
-            billId: params.id,
-            patient: "Aditi Sharma",
-            billDate: new Date().toISOString().slice(0, 10),
-            doctorCharge: 1500,
-            roomCharge: 4000,
-            medicineCharge: 2000,
-            labCharge: 1500,
-            totalAmount: 9000,
-            paymentStatus: "Pending",
-          });
-        }
+        console.warn("Bill fetch error:", err.message);
       } finally {
         setLoading(false);
       }

@@ -69,97 +69,36 @@ function SearchGate({ onNewPatient, onExistingFound }) {
     setSearching(true);
     setResults(null);
 
-    // Search localStorage first, then API
+    // Direct backend search via patientAPI
     let found = [];
-
     try {
-      const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
+      const res = await patientAPI.getPatients();
+      const rawList = res?.success && Array.isArray(res?.data) ? res.data : [];
       const qNorm = q.replace(/\s/g, "").toLowerCase();
 
-      found = stored.filter((p) => {
-        const phone = (p.phone || "").replace(/\s/g, "");
-        const uhid  = (p.uhid || p.id || "").replace(/\s/g, "").toLowerCase();
-        const name  = (p.name || "").replace(/\s/g, "").toLowerCase();
-        return (
-          phone.includes(qNorm) ||
-          uhid.includes(qNorm) ||
-          name.includes(qNorm)
-        );
-      });
-
-      console.log("[SearchGate] localStorage results:", found.length);
-
-      // Also try API — use direct fetch to avoid apiFetch wrapper issues
-      try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const token =
-          localStorage.getItem("hms_token") ||
-          localStorage.getItem("token") ||
-          localStorage.getItem("accessToken") ||
-          "";
-
-        const resp = await fetch(`${API_BASE}/patients/getpatients`, {
-          cache: "no-store",   // bypass browser HTTP cache → avoid 304 empty-body issue
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        if (!resp.ok) {
-          throw new Error(`HTTP ${resp.status}`);
-        }
-
-        console.log("[SearchGate] API status:", resp.status);
-
-        const json = await resp.json();
-        console.log("[SearchGate] API raw response keys:", Object.keys(json));
-
-        // Unwrap response — handle { success, data: [] }, { patients: [] }, or raw []
-        const rawList = Array.isArray(json)
-          ? json
-          : Array.isArray(json?.data)
-          ? json.data
-          : Array.isArray(json?.patients)
-          ? json.patients
-          : [];
-
-        console.log("[SearchGate] API total patients:", rawList.length);
-
-        const apiResults = rawList
-          .filter((p) => {
-            const phone = (p.phone || p.contactNumber || "").replace(/\s/g, "");
-            const uhid  = (p.uhid || p.patientId || "").replace(/\s/g, "").toLowerCase();
-            const name  = (p.name || p.patientName || "").replace(/\s/g, "").toLowerCase();
-            return (
-              phone.includes(qNorm) ||
-              uhid.includes(qNorm) ||
-              name.includes(qNorm)
-            );
-          })
-          .map((p) => ({
-            id:         p.patientId || p._id || p.id,
-            uhid:       p.uhid || p.patientId || p._id,
-            name:       p.name || p.patientName || "Patient",
-            phone:      p.phone || p.contactNumber || "\u2014",
-            gender:     p.gender || "\u2014",
-            age:        p.age || "\u2014",
-            department: p.department || "General",
-            status:     p.status || "Outpatient",
-          }));
-
-        console.log("[SearchGate] API matched:", apiResults.length, apiResults);
-
-        // Merge, deduplicate by id
-        const existingIds = new Set(found.map((p) => String(p.id || p.uhid)));
-        apiResults.forEach((p) => {
-          if (!existingIds.has(String(p.id))) found.push(p);
-        });
-      } catch (apiErr) {
-        console.warn("[SearchGate] API patient search failed:", apiErr?.message || apiErr);
-      }
-    } catch (outerErr) {
-      console.error("[SearchGate] Outer error:", outerErr);
+      found = rawList
+        .filter((p) => {
+          const phone = (p.phone || p.contactNumber || "").replace(/\s/g, "");
+          const uhid  = (p.uhid || p.patientId || p._id || "").replace(/\s/g, "").toLowerCase();
+          const name  = (p.name || p.patientName || "").replace(/\s/g, "").toLowerCase();
+          return (
+            phone.includes(qNorm) ||
+            uhid.includes(qNorm) ||
+            name.includes(qNorm)
+          );
+        })
+        .map((p) => ({
+          id:         p.patientId || p._id || p.id,
+          uhid:       p.patientId || p.uhid || p._id,
+          name:       p.name || p.patientName || "Patient",
+          phone:      p.phone || p.contactNumber || "—",
+          gender:     p.gender || "—",
+          age:        p.age || "—",
+          department: p.department || "General Medicine",
+          status:     p.status || "Outpatient",
+        }));
+    } catch (apiErr) {
+      console.warn("[SearchGate] API patient search failed:", apiErr?.message || apiErr);
       found = [];
     } finally {
       console.log("[SearchGate] Final results:", found.length, found);
@@ -419,20 +358,12 @@ function RegistrationForm({ searchQuery, onBack }) {
       notes:       form.notes,
       registeredAt: new Date().toISOString(),
     };
-
-    // Persist to localStorage
+    // Save to MongoDB via backend API
     try {
-      const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-      localStorage.setItem("hms_local_patients", JSON.stringify([newPatient, ...stored]));
-    } catch {
-      // ignore
-    }
-
-    // Try backend
-    try {
-      await patientAPI.createPatient(newPatient);
-    } catch {
-      // silent — local save is the fallback
+      const res = await patientAPI.createPatient(newPatient);
+      console.log("Patient saved to MongoDB:", res);
+    } catch (err) {
+      console.warn("Backend save warning:", err.message || err);
     }
 
     setLoading(false);

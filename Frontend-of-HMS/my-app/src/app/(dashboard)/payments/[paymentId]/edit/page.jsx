@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -35,26 +35,13 @@ export default function EditPaymentPage() {
     status: "Completed",
   });
 
-  // Load real bills from localStorage + API
+  // Load real bills from API
   useEffect(() => {
     const loadBills = async () => {
       let bills = [];
 
-      // 1. From localStorage billings
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-          stored.forEach((b) => {
-            const id = b.billId || b.id;
-            const patient = b.patient || b.patientName || "Patient";
-            if (id) bills.push({ id, patient });
-          });
-        } catch (e) {}
-      }
-
-      // 2. From billing API
       try {
-        const res = await billingAPI.getBills();
+        const res = await billingAPI.getBillings();
         if (res.success && Array.isArray(res.data)) {
           res.data.forEach((b) => {
             const id = b.billId || b._id || b.id;
@@ -64,32 +51,17 @@ export default function EditPaymentPage() {
         }
       } catch (e) {}
 
-      // 3. Fallback: build from patients if no bills found
+      // Fallback: build from patients if no bills found
       if (bills.length === 0) {
-        let patients = [];
-        if (typeof window !== "undefined") {
-          try {
-            const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-            stored.forEach((p) => {
-              const name = p.name || p.patientName || p.userId?.name;
-              if (name) patients.push(name);
-            });
-          } catch (e) {}
-        }
         try {
           const res = await patientAPI.getPatients();
           if (res.success && Array.isArray(res.data)) {
-            res.data.forEach((p) => {
-              const name = p.name || p.patientName || p.userId?.name;
-              if (name && !patients.includes(name)) patients.push(name);
-            });
+            bills = res.data.map((p, i) => ({
+              id: `BILL-${500 + i + 1}`,
+              patient: p.name || p.patientName || "Patient",
+            }));
           }
         } catch (e) {}
-
-        bills = patients.map((name, i) => ({
-          id: `BILL-${500 + i + 1}`,
-          patient: name,
-        }));
       }
 
       setBillOptions(bills);
@@ -106,32 +78,23 @@ export default function EditPaymentPage() {
       setLoading(true);
 
       let found = null;
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_payments") || "[]");
-          found = stored.find((p) => p.paymentId === paymentId);
-        } catch (e) {}
-      }
-
-      if (!found) {
-        try {
-          const res = await paymentAPI.getPaymentById(paymentId);
-          if (res.success && res.data) {
-            const p = res.data;
-            found = {
-              paymentId: p.paymentId || p._id || p.id,
-              billId: p.billingId?._id || p.billId || "",
-              patient: p.patientName || p.patientId?.name || p.patient || "Patient",
-              amount: p.amount || 0,
-              method: p.paymentMethod || p.method || "UPI",
-              date: p.createdAt ? String(p.createdAt).slice(0, 10) : p.date || "",
-              transactionId: p.transactionId || "",
-              status: p.status || "Completed",
-            };
-          }
-        } catch (err) {
-          console.warn("Edit payment fetch notice:", err.message);
+      try {
+        const res = await paymentAPI.getPaymentById(paymentId);
+        if (res.success && res.data) {
+          const p = res.data;
+          found = {
+            paymentId: p.paymentId || p._id || p.id,
+            billId: p.billingId?._id || p.billId || "",
+            patient: p.patientName || p.patientId?.name || p.patient || "Patient",
+            amount: p.amount || 0,
+            method: p.paymentMethod || p.method || "UPI",
+            date: p.createdAt ? String(p.createdAt).slice(0, 10) : p.date || "",
+            transactionId: p.transactionId || "",
+            status: p.status || "Completed",
+          };
         }
+      } catch (err) {
+        console.warn("Edit payment fetch notice:", err.message);
       }
 
       if (found) {
@@ -143,10 +106,10 @@ export default function EditPaymentPage() {
           transactionId: found.transactionId || "",
           status: found.status || "Completed",
         });
+        setNotFound(false);
       } else {
         setNotFound(true);
       }
-
       setLoading(false);
     };
 
@@ -178,16 +141,6 @@ export default function EditPaymentPage() {
       transactionId: form.transactionId,
       status: form.status,
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_payments") || "[]");
-        const updated = stored.map((p) =>
-          p.paymentId === paymentId ? { ...p, ...updatedPayment } : p
-        );
-        localStorage.setItem("hms_local_payments", JSON.stringify(updated));
-      } catch (err) {}
-    }
 
     try {
       await paymentAPI.updatePayment(paymentId, updatedPayment);

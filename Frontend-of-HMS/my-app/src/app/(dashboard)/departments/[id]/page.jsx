@@ -27,18 +27,23 @@ export default function DepartmentDetailPage() {
   useEffect(() => {
     async function loadDepartment() {
       if (!params?.id) return;
-      let foundLocal = null;
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_departments") || "[]");
-          foundLocal = stored.find((d) => d.id === params.id || d._id === params.id);
-        } catch (e) {}
-      }
 
       try {
-        const res = await departmentAPI.getDepartmentById(params.id);
-        if (res.success && res.data) {
-          const d = res.data;
+        let found = null;
+        try {
+          const res = await departmentAPI.getDepartmentById(params.id);
+          if (res.success && res.data) found = res.data;
+        } catch (_) {}
+
+        if (!found) {
+          const allRes = await departmentAPI.getDepartments();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find((d) => d.departmentId === params.id || d._id === params.id || d.id === params.id);
+          }
+        }
+
+        if (found) {
+          const d = found;
           setDepartment({
             id: d.departmentId || d._id || params.id,
             name: d.name || d.departmentName || "Department",
@@ -54,29 +59,9 @@ export default function DepartmentDetailPage() {
             phone: d.phone || "+91 751 245 1001",
             email: d.email || "department@medicare.com",
           });
-        } else if (foundLocal) {
-          setDepartment(foundLocal);
         }
       } catch (err) {
-        if (foundLocal) {
-          setDepartment(foundLocal);
-        } else {
-          setDepartment({
-            id: params.id,
-            name: "Cardiology",
-            description: "Heart and cardiovascular care, emergency cardiac interventions.",
-            location: "Block A - 2nd Floor",
-            head: "Dr. Ankit Sharma",
-            doctors: 18,
-            nurses: 32,
-            beds: 42,
-            availableBeds: 14,
-            patients: 86,
-            status: "Active",
-            phone: "+91 751 245 1001",
-            email: "cardiology@medicare.com",
-          });
-        }
+        console.warn("Department load notice:", err.message);
       } finally {
         setLoading(false);
       }

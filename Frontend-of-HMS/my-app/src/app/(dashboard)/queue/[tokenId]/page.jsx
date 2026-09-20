@@ -136,60 +136,29 @@ function PatientHistoryPanel({ entry }) {
 
   useEffect(() => {
     async function loadHistory() {
-      // 1. Try localStorage first
       try {
-        const patients = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-        const p = patients.find(
-          (x) => x.id === entry.patientId || x.uhid === entry.patientUhid || x.name === entry.patient
-        );
-        if (p) {
-          setHistory({
-            allergies:  Array.isArray(p.allergies) ? p.allergies.join(", ") : (p.allergies || ""),
-            bloodGroup: p.bloodGroup || "",
-            dob:        p.dob || p.dateOfBirth || "",
-            age:        p.age || "",
-            gender:     p.gender || "",
-            notes:      p.notes || p.medicalHistory || "",
-          });
-          return; // found locally — done
-        }
-      } catch { /* ignore */ }
-
-      // 2. Fallback: fetch from API (handles MongoDB-only patients)
-      try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const token = localStorage.getItem("hms_token") || localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
-
-        // Try by patientId first, then search all
         const ids = [entry.patientId, entry.patientUhid].filter(Boolean);
         let found = null;
 
         for (const id of ids) {
           try {
-            const resp = await fetch(`${API_BASE}/patients/getpatientby/${id}`, {
-              cache: "no-store",
-              headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            });
-            if (resp.ok) {
-              const json = await resp.json();
-              const p = json?.data || json?.patient || (json?._id ? json : null);
-              if (p) { found = p; break; }
+            const res = await patientAPI.getPatientById(id);
+            if (res.success && res.data) {
+              found = res.data;
+              break;
             }
-          } catch { /* ignore */ }
+          } catch (_) {}
         }
 
-        // If not found by ID, search all patients by name
-        if (!found && entry.patient) {
-          const resp = await fetch(`${API_BASE}/patients/getpatients`, {
-            cache: "no-store",
-            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          });
-          if (resp.ok) {
-            const json = await resp.json();
-            const list = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-            found = list.find(
-              (x) => (x.name || x.patientName || "").toLowerCase() === entry.patient.toLowerCase()
-            ) || null;
+        if (!found) {
+          const allRes = await patientAPI.getPatients();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find(
+              (x) =>
+                (entry.patientId && (x.patientId === entry.patientId || x.id === entry.patientId || x._id === entry.patientId)) ||
+                (entry.patientUhid && (x.uhid === entry.patientUhid || x.patientId === entry.patientUhid)) ||
+                (entry.patient && (x.name?.toLowerCase() === entry.patient.toLowerCase() || x.patientName?.toLowerCase() === entry.patient.toLowerCase()))
+            );
           }
         }
 
@@ -197,13 +166,15 @@ function PatientHistoryPanel({ entry }) {
           setHistory({
             allergies:  Array.isArray(found.allergies) ? found.allergies.join(", ") : (found.allergies || ""),
             bloodGroup: found.bloodGroup || "",
-            dob:        found.dateOfBirth || found.dob || "",
+            dob:        found.dob || found.dateOfBirth || "",
             age:        found.age || "",
             gender:     found.gender || "",
-            notes:      found.medicalHistory || found.notes || "",
+            notes:      found.notes || found.medicalHistory || "",
           });
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.warn("Error loading patient history:", err.message);
+      }
     }
     loadHistory();
   }, [entry]);
@@ -374,20 +345,29 @@ export default function ConsultationPage() {
       status:    "Pending",
     };
 
-    // Save to localStorage modules
+    // Save prescription to backend API
     try {
-      // Prescriptions
       if (prescriptionData.drugs.length > 0) {
-        const rxStore = JSON.parse(localStorage.getItem("hms_local_prescriptions") || "[]");
-        localStorage.setItem("hms_local_prescriptions", JSON.stringify([prescriptionData, ...rxStore]));
-        try { await prescriptionAPI.createPrescription(prescriptionData); } catch { /* ignore */ }
+        await prescriptionAPI.createPrescription({
+          rxId: prescriptionId,
+          patientId: entry?.patientId || undefined,
+          patientName: entry?.patient || undefined,
+          doctorId: entry?.doctorId || undefined,
+          doctorName: entry?.doctor || undefined,
+          diagnosis: consult.diagnosis,
+          medicines: prescriptionData.drugs.map((d) => ({
+            name: d.name,
+            dosage: d.dosage || "1 tablet",
+            frequency: d.frequency || "once_daily",
+            duration: d.duration || "5 days",
+            instructions: d.timing || "",
+          })),
+          status: "Pending Dispense",
+        });
       }
-      // Lab orders
-      if (labOrderData.tests.length > 0) {
-        const loStore = JSON.parse(localStorage.getItem("hms_local_lab_orders") || "[]");
-        localStorage.setItem("hms_local_lab_orders", JSON.stringify([labOrderData, ...loStore]));
-      }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn("API create prescription notice:", err.message);
+    }
 
     // Save consultation data + mark queue complete
     saveConsultation(tokenId, {

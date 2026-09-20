@@ -29,13 +29,6 @@ export default function DoctorsPage() {
 
   const fetchDoctors = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await doctorAPI.getDoctors();
       if (res.success && Array.isArray(res.data)) {
@@ -52,16 +45,13 @@ export default function DoctorsPage() {
           patients: d.patientsCount || 15,
           initials: (d.name || "Dr").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2),
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.id));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.id));
-        setDoctorList([...uniqueLocals, ...formatted]);
+        setDoctorList(formatted);
       } else {
-        setDoctorList(localItems);
+        setDoctorList([]);
       }
     } catch (err) {
       console.warn("Doctor API load notice:", err.message);
-      setDoctorList(localItems);
+      setDoctorList([]);
     } finally {
       setLoading(false);
     }
@@ -79,13 +69,6 @@ export default function DoctorsPage() {
       console.warn("Delete doctor notice:", err.message);
     } finally {
       setDoctorList((prev) => prev.filter((d) => d.id !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-          const updated = stored.filter((d) => d.id !== id);
-          localStorage.setItem("hms_local_doctors", JSON.stringify(updated));
-        } catch (e) {}
-      }
       setOpenMenuId(null);
     }
   };

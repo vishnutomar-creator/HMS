@@ -18,26 +18,13 @@ export default function AddPaymentPage() {
     transactionId: "",
   });
 
-  // Load real bills from localStorage + API
+  // Load real bills from API
   useEffect(() => {
     const loadBills = async () => {
       let bills = [];
 
-      // 1. From localStorage billings
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_billings") || "[]");
-          stored.forEach((b) => {
-            const id = b.billId || b.id;
-            const patient = b.patient || b.patientName || "Patient";
-            if (id) bills.push({ id, patient });
-          });
-        } catch (e) {}
-      }
-
-      // 2. From billing API
       try {
-        const res = await billingAPI.getBills();
+        const res = await billingAPI.getBillings();
         if (res.success && Array.isArray(res.data)) {
           res.data.forEach((b) => {
             const id = b.billId || b._id || b.id;
@@ -47,32 +34,17 @@ export default function AddPaymentPage() {
         }
       } catch (e) {}
 
-      // 3. Fallback: build from patients if no bills exist
+      // Fallback: build from patients if no bills exist
       if (bills.length === 0) {
-        let patients = [];
-        if (typeof window !== "undefined") {
-          try {
-            const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-            stored.forEach((p) => {
-              const name = p.name || p.patientName || p.userId?.name;
-              if (name) patients.push(name);
-            });
-          } catch (e) {}
-        }
         try {
           const res = await patientAPI.getPatients();
           if (res.success && Array.isArray(res.data)) {
-            res.data.forEach((p) => {
-              const name = p.name || p.patientName || p.userId?.name;
-              if (name && !patients.includes(name)) patients.push(name);
-            });
+            bills = res.data.map((p, i) => ({
+              id: `BILL-${500 + i + 1}`,
+              patient: p.name || p.patientName || "Patient",
+            }));
           }
         } catch (e) {}
-
-        bills = patients.map((name, i) => ({
-          id: `BILL-${500 + i + 1}`,
-          patient: name,
-        }));
       }
 
       setBillOptions(bills);
@@ -103,13 +75,6 @@ export default function AddPaymentPage() {
       date: form.date || "Today",
       status: "Completed",
     };
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_payments") || "[]");
-        localStorage.setItem("hms_local_payments", JSON.stringify([newPaymentObj, ...stored]));
-      } catch (err) {}
-    }
 
     try {
       await paymentAPI.createPayment(newPaymentObj);

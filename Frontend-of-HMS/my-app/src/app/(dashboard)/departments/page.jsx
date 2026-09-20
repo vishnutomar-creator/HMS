@@ -26,16 +26,9 @@ export default function DepartmentsPage() {
 
   const fetchDepartments = async () => {
     setLoading(true);
-    let localItems = [];
-    if (typeof window !== "undefined") {
-      try {
-        localItems = JSON.parse(localStorage.getItem("hms_local_departments") || "[]");
-      } catch (e) {}
-    }
-
     try {
       const res = await departmentAPI.getDepartments();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const formatted = res.data.map((d, index) => ({
           id: d.departmentId || d._id || `DEP-00${index + 1}`,
           name: d.name || d.departmentName || "Department",
@@ -52,16 +45,13 @@ export default function DepartmentsPage() {
           email: d.email || `${(d.name || "dept").toLowerCase().replace(/\s+/g, "")}@medicare.com`,
           color: "bg-[#E7F5F2] text-[#0F766E]",
         }));
-
-        const apiIds = new Set(formatted.map((item) => item.id));
-        const uniqueLocals = localItems.filter((item) => !apiIds.has(item.id));
-        setDeptList([...uniqueLocals, ...formatted]);
+        setDeptList(formatted);
       } else {
-        setDeptList(localItems);
+        setDeptList([]);
       }
     } catch (err) {
       console.warn("Department API load notice:", err.message);
-      setDeptList(localItems);
+      setDeptList([]);
     } finally {
       setLoading(false);
     }
@@ -79,13 +69,6 @@ export default function DepartmentsPage() {
       console.warn("Delete department notice:", err.message);
     } finally {
       setDeptList((prev) => prev.filter((d) => d.id !== id));
-      if (typeof window !== "undefined") {
-        try {
-          const stored = JSON.parse(localStorage.getItem("hms_local_departments") || "[]");
-          const updated = stored.filter((d) => d.id !== id);
-          localStorage.setItem("hms_local_departments", JSON.stringify(updated));
-        } catch (e) {}
-      }
     }
   };
 

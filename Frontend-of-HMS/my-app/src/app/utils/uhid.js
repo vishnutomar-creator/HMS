@@ -35,7 +35,7 @@ export async function syncUHIDSequenceWithDB() {
           localStorage.getItem("accessToken")
         )) || "";
 
-      const resp = await fetch(`${API_BASE}/patients/getpatients`, {
+      const resp = await fetch(`${API_BASE}/patients`, {
         cache: "no-store",
         headers: {
           "Content-Type": "application/json",
@@ -57,18 +57,6 @@ export async function syncUHIDSequenceWithDB() {
           maxSeq = parsed.sequence;
         }
       });
-
-      // Also check localStorage patients
-      try {
-        const local = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-        local.forEach((p) => {
-          const uhid = p.uhid || p.id || "";
-          const parsed = parseUHID(uhid);
-          if (parsed && parsed.sequence > maxSeq) {
-            maxSeq = parsed.sequence;
-          }
-        });
-      } catch { /* ignore */ }
 
       // Bump local counter if it's behind
       const current = _readSequence();

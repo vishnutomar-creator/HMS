@@ -75,33 +75,11 @@ export default function BookAppointmentPage() {
       let pList = [];
       let dList = [];
 
-      // ── localStorage ──────────────────────────────────────────────────
-      try {
-        const storedP = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-        storedP.forEach((p) => {
-          const name = p.name || p.patientName;
-          if (name && !pList.find((x) => x.name === name)) {
-            pList.push({ name, id: p.id || p.uhid || "", uhid: p.uhid || p.id || "" });
-          }
-        });
-        const storedD = JSON.parse(localStorage.getItem("hms_local_doctors") || "[]");
-        storedD.forEach((d) => {
-          if (d.name && !dList.includes(d.name)) dList.push(d.name);
-        });
-      } catch { /* ignore */ }
-
       // ── API — patients ────────────────────────────────────────────────
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const token = localStorage.getItem("hms_token") || localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
-        const pResp = await fetch(`${API_BASE}/patients/getpatients`, {
-          cache: "no-store",
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        });
-        if (pResp.ok) {
-          const pJson = await pResp.json();
-          const pData = Array.isArray(pJson) ? pJson : Array.isArray(pJson?.data) ? pJson.data : [];
-          pData.forEach((p) => {
+        const pResp = await patientAPI.getPatients();
+        if (pResp.success && Array.isArray(pResp.data)) {
+          pResp.data.forEach((p) => {
             const name = p.name || p.patientName || p.userId?.name;
             if (name && !pList.find((x) => x.name === name)) {
               pList.push({ name, id: p.patientId || p._id || p.id || "", uhid: p.uhid || p.patientId || "" });
@@ -112,16 +90,9 @@ export default function BookAppointmentPage() {
 
       // ── API — doctors ─────────────────────────────────────────────────
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const token = localStorage.getItem("hms_token") || localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
-        const dResp = await fetch(`${API_BASE}/doctors/`, {
-          cache: "no-store",
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        });
-        if (dResp.ok) {
-          const dJson = await dResp.json();
-          const dData = Array.isArray(dJson) ? dJson : Array.isArray(dJson?.data) ? dJson.data : Array.isArray(dJson?.doctors) ? dJson.doctors : [];
-          dData.forEach((d) => {
+        const dResp = await doctorAPI.getDoctors();
+        if (dResp.success && Array.isArray(dResp.data)) {
+          dResp.data.forEach((d) => {
             const name = d.name || d.doctorName || d.userId?.name;
             if (name && !dList.includes(name)) dList.push(name);
           });
@@ -188,12 +159,7 @@ export default function BookAppointmentPage() {
       token,                        // ← OPD token attached to appointment
     };
 
-    // Persist appointment
-    try {
-      const stored = JSON.parse(localStorage.getItem("hms_local_appointments") || "[]");
-      localStorage.setItem("hms_local_appointments", JSON.stringify([newAptObj, ...stored]));
-    } catch { /* ignore */ }
-
+    // Persist appointment to backend API
     try { await appointmentAPI.createAppointment(newAptObj); } catch { /* ignore */ }
 
     // Auto-enqueue if today's date or sendToQueue

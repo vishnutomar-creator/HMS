@@ -238,25 +238,32 @@ export default function PatientDetailPage() {
     async function loadPatient() {
       if (!params?.id) return;
 
-      // Try localStorage first
-      let foundLocal = null;
       try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_patients") || "[]");
-        foundLocal = stored.find(
-          (p) => p.id === params.id || p.uhid === params.id || p._id === params.id
-        );
-      } catch { /* ignore */ }
+        let found = null;
+        try {
+          const res = await patientAPI.getPatientById(params.id);
+          if (res.success && res.data) {
+            found = res.data;
+          }
+        } catch (_) {}
 
-      try {
-        const res = await patientAPI.getPatientById(params.id);
-        if (res.success && res.data) {
-          const d = res.data;
+        if (!found) {
+          const allRes = await patientAPI.getPatients();
+          if (allRes.success && Array.isArray(allRes.data)) {
+            found = allRes.data.find(
+              (p) => p.patientId === params.id || p.uhid === params.id || p._id === params.id || p.id === params.id
+            );
+          }
+        }
+
+        if (found) {
+          const d = found;
           setPatient({
             id:          d.uhid || d.patientId || d._id || params.id,
             uhid:        d.uhid || d.patientId || d._id || params.id,
             name:        d.name || d.patientName || "Patient",
             age:         d.age || 30,
-            dob:         d.dob || "",
+            dob:         d.dob || d.dateOfBirth || "",
             gender:      d.gender || "Male",
             phone:       d.phone || "+91 98765 43210",
             email:       d.email || "patient@example.com",
@@ -264,36 +271,13 @@ export default function PatientDetailPage() {
             department:  d.department || "General Medicine",
             status:      d.status || "Outpatient",
             address:     d.address || "Not provided",
-            allergies:   d.allergies || "",
-            emergencyContact: d.emergencyContact || null,
-            registeredAt: d.registeredAt || "",
-          });
-        } else if (foundLocal) {
-          setPatient(foundLocal);
-        }
-      } catch {
-        if (foundLocal) {
-          setPatient(foundLocal);
-        } else {
-          // Demo fallback
-          setPatient({
-            id:          params.id,
-            uhid:        params.id,
-            name:        "Aditi Sharma",
-            age:         34,
-            dob:         "1992-03-15",
-            gender:      "Female",
-            phone:       "+91 98765 43210",
-            email:       "aditi.sharma@example.com",
-            bloodGroup:  "B+",
-            department:  "Cardiology",
-            status:      "Outpatient",
-            address:     "House 42, Civil Lines, Sector 5, New Delhi — 110001",
-            allergies:   "Penicillin, Shellfish",
-            emergencyContact: { name: "Rohan Sharma", phone: "+91 98765 11111", relation: "Spouse" },
-            registeredAt: "2024-01-10T09:00:00Z",
+            allergies:   Array.isArray(d.allergies) ? d.allergies.join(", ") : (d.allergies || ""),
+            emergencyContact: d.emergencyContact || (d.emergencyContactName ? { name: d.emergencyContactName, phone: d.emergencyContactPhone, relation: d.emergencyContactRelation } : null),
+            registeredAt: d.registeredAt || d.createdAt || "",
           });
         }
+      } catch (err) {
+        console.warn("Error fetching patient details:", err.message);
       } finally {
         setLoading(false);
       }

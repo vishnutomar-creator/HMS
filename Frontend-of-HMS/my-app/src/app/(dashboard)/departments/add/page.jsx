@@ -53,13 +53,6 @@ export default function AddDepartmentPage() {
       color: "bg-[#E7F5F2] text-[#0F766E]",
     };
 
-    if (typeof window !== "undefined") {
-      try {
-        const stored = JSON.parse(localStorage.getItem("hms_local_departments") || "[]");
-        localStorage.setItem("hms_local_departments", JSON.stringify([newDeptObj, ...stored]));
-      } catch (err) {}
-    }
-
     try {
       await departmentAPI.createDepartment({
         departmentId: form.departmentId,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Activity,
@@ -21,193 +21,33 @@ import {
   X,
 } from "lucide-react";
 
-import { useMemo, useState } from "react";
-
-const initialBeds = [
-  {
-    id: "BED-001",
-    bedNumber: "ICU-01",
-    ward: "ICU",
-    wardId: "WRD-005",
-    floor: "Ground Floor",
-    type: "ICU",
-    status: "Occupied",
-    patient: "Aditi Sharma",
-    patientId: "PT-1042",
-    admissionId: "ADM-3001",
-    assignedDoctor: "Dr. Rajiv Sharma",
-    lastCleaned: "12 Aug 2026",
-    equipment: "Ventilator Available",
-  },
-  {
-    id: "BED-002",
-    bedNumber: "ICU-02",
-    ward: "ICU",
-    wardId: "WRD-005",
-    floor: "Ground Floor",
-    type: "ICU",
-    status: "Available",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "13 Aug 2026",
-    equipment: "Fully Equipped",
-  },
-  {
-    id: "BED-003",
-    bedNumber: "GEN-101",
-    ward: "General Medicine Ward",
-    wardId: "WRD-007",
-    floor: "1st Floor",
-    type: "General",
-    status: "Occupied",
-    patient: "Rohan Verma",
-    patientId: "PT-1043",
-    admissionId: "ADM-3003",
-    assignedDoctor: "Dr. Amit Verma",
-    lastCleaned: "11 Aug 2026",
-    equipment: "Standard",
-  },
-  {
-    id: "BED-004",
-    bedNumber: "GEN-102",
-    ward: "General Medicine Ward",
-    wardId: "WRD-007",
-    floor: "1st Floor",
-    type: "General",
-    status: "Cleaning",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "13 Aug 2026",
-    equipment: "Standard",
-  },
-  {
-    id: "BED-005",
-    bedNumber: "CARD-201",
-    ward: "Cardiology Ward A",
-    wardId: "WRD-001",
-    floor: "2nd Floor",
-    type: "General",
-    status: "Occupied",
-    patient: "Karan Malhotra",
-    patientId: "PT-1067",
-    admissionId: "ADM-3008",
-    assignedDoctor: "Dr. Neha Singh",
-    lastCleaned: "12 Aug 2026",
-    equipment: "Cardiac Monitor",
-  },
-  {
-    id: "BED-006",
-    bedNumber: "CARD-202",
-    ward: "Cardiology Ward A",
-    wardId: "WRD-001",
-    floor: "2nd Floor",
-    type: "Private",
-    status: "Available",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "13 Aug 2026",
-    equipment: "Cardiac Monitor",
-  },
-  {
-    id: "BED-007",
-    bedNumber: "ORTH-301",
-    ward: "Orthopedic Ward A",
-    wardId: "WRD-003",
-    floor: "3rd Floor",
-    type: "General",
-    status: "Occupied",
-    patient: "Meera Nair",
-    patientId: "PT-1081",
-    admissionId: "ADM-3012",
-    assignedDoctor: "Dr. Karan Patel",
-    lastCleaned: "12 Aug 2026",
-    equipment: "Standard",
-  },
-  {
-    id: "BED-008",
-    bedNumber: "ORTH-302",
-    ward: "Orthopedic Ward A",
-    wardId: "WRD-003",
-    floor: "3rd Floor",
-    type: "General",
-    status: "Maintenance",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "09 Aug 2026",
-    equipment: "Bed Repair Required",
-  },
-  {
-    id: "BED-009",
-    bedNumber: "PVT-401",
-    ward: "Private Care Ward",
-    wardId: "WRD-008",
-    floor: "4th Floor",
-    type: "Private",
-    status: "Available",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "13 Aug 2026",
-    equipment: "Fully Equipped",
-  },
-  {
-    id: "BED-010",
-    bedNumber: "PVT-402",
-    ward: "Private Care Ward",
-    wardId: "WRD-008",
-    floor: "4th Floor",
-    type: "Private",
-    status: "Occupied",
-    patient: "Priya Sharma",
-    patientId: "PT-1104",
-    admissionId: "ADM-3016",
-    assignedDoctor: "Dr. Rahul Mehta",
-    lastCleaned: "12 Aug 2026",
-    equipment: "Fully Equipped",
-  },
-  {
-    id: "BED-011",
-    bedNumber: "PED-101",
-    ward: "Pediatric Ward",
-    wardId: "WRD-004",
-    floor: "1st Floor",
-    type: "Pediatric",
-    status: "Available",
-    patient: null,
-    patientId: null,
-    admissionId: null,
-    assignedDoctor: null,
-    lastCleaned: "13 Aug 2026",
-    equipment: "Pediatric Equipment",
-  },
-  {
-    id: "BED-012",
-    bedNumber: "EMG-101",
-    ward: "Emergency Unit",
-    wardId: "WRD-006",
-    floor: "Ground Floor",
-    type: "Emergency",
-    status: "Reserved",
-    patient: null,
-    patientId: null,
-    admissionId: "ADM-3020",
-    assignedDoctor: "Dr. Priya Gupta",
-    lastCleaned: "13 Aug 2026",
-    equipment: "Emergency Equipped",
-  },
-];
+import { useMemo, useState, useEffect } from "react";
+import { getBedsFromStorage, saveBedsToStorage } from "../../utils/bedStore";
 
 export default function BedsPage() {
-  const [beds, setBeds] = useState(initialBeds);
+  const [beds, setBeds] = useState([]);
+
+  // Load from shared storage on mount; react to external changes
+  const loadBeds = () => setBeds(getBedsFromStorage());
+  useEffect(() => {
+    loadBeds();
+    const handler = () => loadBeds();
+    window.addEventListener("hms_beds_updated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("hms_beds_updated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  // Helper: update state AND persist to shared store
+  const persistBeds = (updater) => {
+    setBeds((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveBedsToStorage(next);
+      return next;
+    });
+  };
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -337,48 +177,27 @@ export default function BedsPage() {
     e.preventDefault();
 
     if (editing && selectedBed) {
-      setBeds((prev) =>
+      persistBeds((prev) =>
         prev.map((bed) =>
-          bed.id === selectedBed.id
-            ? {
-                ...bed,
-                ...form,
-              }
-            : bed
+          bed.id === selectedBed.id ? { ...bed, ...form } : bed
         )
       );
     } else {
       const newBed = {
         ...form,
-        id: `BED-${String(
-          beds.length + 1
-        ).padStart(3, "0")}`,
-        wardId: `WRD-${String(
-          beds.length + 1
-        ).padStart(3, "0")}`,
-        patient: null,
-        patientId: null,
-        admissionId: null,
-        assignedDoctor: null,
+        id: `BED-${String(beds.length + 1).padStart(3, "0")}`,
+        wardId: `WRD-${String(beds.length + 1).padStart(3, "0")}`,
+        patient: null, patientId: null, admissionId: null, assignedDoctor: null,
       };
-
-      setBeds((prev) => [...prev, newBed]);
+      persistBeds((prev) => [...prev, newBed]);
     }
-
     closeForm();
   };
 
   const deleteBed = (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this bed?"
-    );
-
+    const confirmed = window.confirm("Are you sure you want to delete this bed?");
     if (!confirmed) return;
-
-    setBeds((prev) =>
-      prev.filter((bed) => bed.id !== id)
-    );
-
+    persistBeds((prev) => prev.filter((bed) => bed.id !== id));
     setSelectedBed(null);
   };
 

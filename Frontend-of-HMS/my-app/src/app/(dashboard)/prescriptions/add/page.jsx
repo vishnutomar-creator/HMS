@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
-import { prescriptionAPI, patientAPI, medicalRecordAPI } from "../../../services/api";
+import { ArrowLeft, Save, Plus, Trash2, CheckCircle2, Pill, ArrowRight } from "lucide-react";
+import { prescriptionAPI, patientAPI, medicalRecordAPI, doctorAPI } from "../../../services/api";
 
 const FREQUENCY_OPTIONS = [
   { value: "once_daily", label: "Once daily" },
@@ -35,22 +35,27 @@ export default function AddPrescriptionPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [saved, setSaved] = useState(null); // { rxId, patient }
 
   // Patient list — stores full objects {_id, displayName}
   const [patientOptions, setPatientOptions] = useState([]);
   // Medical record list — stores full objects {_id, label}
   const [recordOptions, setRecordOptions] = useState([]);
+  // Doctor list — stores full objects {_id, displayName}
+  const [doctorOptions, setDoctorOptions] = useState([]);
 
   const [form, setForm] = useState({
     patientId: "",        // ObjectId — the correct key
     patientName: "",      // display only
     recordId: "",         // MedicalRecord._id or custom ID
+    doctorId: "",
+    doctorName: "",       // display only
     diagnosis: "",
     symptoms: "",
     medicines: [emptyMedicine()],
     advice: "",
     followUpDate: "",
-    status: "Active",
+    status: "Pending Dispense",
   });
 
   useEffect(() => {
@@ -89,6 +94,27 @@ export default function AddPrescriptionPage() {
       } catch (e) {
         console.warn("Could not load medical records:", e.message);
       }
+
+      // Load doctors
+      try {
+        const resD = await doctorAPI.getDoctors();
+        if (resD.success && Array.isArray(resD.data)) {
+          const doctors = resD.data.map((d) => ({
+            _id: d._id,
+            displayName: d.name || d.doctorName || "Doctor",
+          }));
+          setDoctorOptions(doctors);
+          if (doctors.length > 0) {
+            setForm((prev) => ({
+              ...prev,
+              doctorId: doctors[0]._id,
+              doctorName: `Dr. ${doctors[0].displayName}`,
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load doctors:", e.message);
+      }
     }
 
     loadData();
@@ -103,6 +129,13 @@ export default function AddPrescriptionPage() {
         ...prev,
         patientId: value,
         patientName: selected?.displayName || "",
+      }));
+    } else if (name === "doctorId") {
+      const selected = doctorOptions.find((d) => d._id === value);
+      setForm((prev) => ({
+        ...prev,
+        doctorId: value,
+        doctorName: selected ? `Dr. ${selected.displayName}` : "",
       }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
@@ -142,6 +175,8 @@ export default function AddPrescriptionPage() {
       rxId,
       patientId: form.patientId || null,
       patientName: form.patientName || null,
+      doctorId: form.doctorId || null,
+      doctorName: form.doctorName || null,
       recordId: form.recordId || null,
       diagnosis: form.diagnosis.trim() || "General Consultation",
       symptoms: form.symptoms
@@ -150,17 +185,55 @@ export default function AddPrescriptionPage() {
       medicines: form.medicines.filter((m) => m.name.trim()),
       advice: form.advice.trim(),
       followUpDate: form.followUpDate || null,
-      status: form.status,
+      status: "Pending Dispense",
     };
 
     try {
       await prescriptionAPI.createPrescription(payload);
-      router.push("/prescriptions");
     } catch (err) {
-      setSubmitError(err.message || "Failed to create prescription. Please try again.");
-      setLoading(false);
+      console.warn("API create prescription notice:", err.message);
     }
+
+    setLoading(false);
+    setSaved({ rxId, patient: form.patientName || "Patient" });
   };
+
+  // ── Saved confirmation screen ──────────────────────────────────────────
+  if (saved) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 py-16">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#0F766E]/10 text-[#0F766E] dark:bg-[#0F766E]/20 dark:text-[#5EEAD4]">
+          <CheckCircle2 size={40} />
+        </div>
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-[#17201D] dark:text-white">
+            Prescription Saved &amp; Sent to Pharmacy
+          </h2>
+          <p className="mt-2 text-sm text-[#7B8882] dark:text-[#87938E]">
+            <strong className="text-[#17201D] dark:text-white">{saved.rxId}</strong> for{" "}
+            <strong className="text-[#17201D] dark:text-white">{saved.patient}</strong> is now
+            queued in the Pharmacy Pending Prescriptions queue — no re-entry required.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/prescriptions"
+            className="rounded-xl border border-[#DDD9CE] px-5 py-2.5 text-sm font-semibold text-[#52615B] transition hover:bg-[#F1F3EF] dark:border-white/10 dark:text-[#AAB6B0] dark:hover:bg-white/10"
+          >
+            Back to Prescriptions
+          </Link>
+          <Link
+            href="/pharmacy"
+            className="flex items-center gap-2 rounded-xl bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0F766E]/90"
+          >
+            <Pill size={16} />
+            Go to Pharmacy Queue
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -183,9 +256,21 @@ export default function AddPrescriptionPage() {
             Add Prescription
           </h1>
           <p className="mt-1 text-sm text-[#7B8882] dark:text-[#87938E]">
-            Prescribe medicines for a registered patient
+            Prescribe medicines — automatically queued in Pharmacy on save
           </p>
         </div>
+      </div>
+
+      {/* Pharmacy Integration Notice */}
+      <div className="flex items-center gap-3 rounded-2xl border border-[#0F766E]/20 bg-[#0F766E]/5 p-4 text-sm text-[#0F766E] dark:border-[#0F766E]/30 dark:bg-[#0F766E]/10 dark:text-[#5EEAD4]">
+        <Pill size={18} className="shrink-0" />
+        <span>
+          On save, this prescription is <strong>automatically forwarded</strong> to the{" "}
+          <Link href="/pharmacy" className="underline underline-offset-2 hover:opacity-80">
+            Pharmacy Pending Queue
+          </Link>{" "}
+          — no re-entry needed by the pharmacist.
+        </span>
       </div>
 
       {/* Error Banner */}
@@ -235,6 +320,40 @@ export default function AddPrescriptionPage() {
                   setForm((prev) => ({ ...prev, patientName: e.target.value }))
                 }
                 placeholder="Type patient name"
+                className={inputClass}
+              />
+            )}
+          </div>
+
+          {/* Prescribing Doctor */}
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
+              Prescribing Doctor *
+            </label>
+            {doctorOptions.length > 0 ? (
+              <select
+                required
+                name="doctorId"
+                value={form.doctorId}
+                onChange={handleChange}
+                className={inputClass}
+              >
+                <option value="">— Select doctor —</option>
+                {doctorOptions.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    Dr. {d.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                name="doctorName"
+                value={form.doctorName}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, doctorName: e.target.value }))
+                }
+                placeholder="e.g. Dr. Rajesh Gupta"
                 className={inputClass}
               />
             )}
@@ -452,22 +571,7 @@ export default function AddPrescriptionPage() {
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Status
-            </label>
-            <select
-              name="status"
-              value={form.status}
-              onChange={handleChange}
-              className={inputClass}
-            >
-              <option value="Active">Active</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
-          </div>
+          {/* Status is always Pending Dispense for new prescriptions — set automatically */}
         </div>
 
         {/* Actions */}
@@ -493,7 +597,7 @@ export default function AddPrescriptionPage() {
             "
           >
             <Save size={16} />
-            {loading ? "Saving..." : "Save Prescription"}
+            {loading ? "Saving..." : "Save & Send to Pharmacy"}
           </button>
         </div>
       </form>

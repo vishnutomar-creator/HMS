@@ -8,6 +8,8 @@ const {
   getPrescriptionsByDoctor,
   updatePrescription,
   deletePrescription,
+  dispensePrescription,
+  returnPrescription,
 } = require(
   "../controllers/prescription.controller"
 );
@@ -67,6 +69,20 @@ router.put(
   authMiddleware,
   validateUpdatePrescription,
   updatePrescription
+);
+
+// DISPENSE
+router.post(
+  "/prescriptions/:id/dispense",
+  authMiddleware,
+  dispensePrescription
+);
+
+// RETURN
+router.post(
+  "/prescriptions/:id/return",
+  authMiddleware,
+  returnPrescription
 );
 
 // DELETE

@@ -30,6 +30,7 @@ const prescriptionRoutes = require("./prescription.routes");
 const medicalRecordRoutes = require("./medicalRecord.routes");
 const billingRoutes = require("./billing.routes");
 const paymentRoutes = require("./payment.routes");
+const inventoryRoutes = require("./inventory.routes");
 
 // =========================
 // Route Mounting
@@ -58,6 +59,8 @@ router.use("/", notificationRoutes);
 router.use("/", prescriptionRoutes);
 
 router.use("/", medicalRecordRoutes);
+
+router.use("/", inventoryRoutes);
 
 router.use("/billings", billingRoutes);
 
