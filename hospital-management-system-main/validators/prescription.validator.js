@@ -82,17 +82,13 @@ const validateUpdatePrescription = (
   res,
   next
 ) => {
-  const allowed = [
-    "active",
-    "pending dispense",
-    "dispensed",
-    "returned",
-    "completed",
-    "cancelled",
-  ];
   if (
     req.body.status &&
-    !allowed.includes(String(req.body.status).toLowerCase())
+    ![
+      "active",
+      "completed",
+      "cancelled",
+    ].includes(req.body.status)
   ) {
     return res.status(400).json({
       success: false,

@@ -104,57 +104,6 @@ const deletePrescription = async (id) => {
   return prescription;
 };
 
-const inventoryService = require("./inventory.service");
-
-const dispensePrescription = async (id, dispensedBy = "Pharmacist") => {
-  const prescription = await getPrescriptionById(id);
-  if (!prescription) {
-    const error = new Error("Prescription not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // Deduct inventory stock — will throw error if stock is insufficient
-  await inventoryService.dispenseMedicines(prescription.medicines || []);
-
-  prescription.status = "Dispensed";
-  prescription.dispensedAt = new Date();
-  prescription.dispensedBy = dispensedBy;
-  await prescription.save();
-
-  return prescription;
-};
-
-const returnPrescription = async (id, returnedItems = [], reason = "Patient Return") => {
-  const prescription = await getPrescriptionById(id);
-  if (!prescription) {
-    const error = new Error("Prescription not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // Restore inventory stock
-  await inventoryService.returnMedicines(returnedItems);
-
-  if (!Array.isArray(prescription.returnHistory)) {
-    prescription.returnHistory = [];
-  }
-
-  for (const item of returnedItems) {
-    prescription.returnHistory.push({
-      returnedAt: new Date(),
-      medicineName: item.medicineName || item.name,
-      quantity: Number(item.quantity) || 1,
-      reason,
-    });
-  }
-
-  prescription.status = "Returned";
-  await prescription.save();
-
-  return prescription;
-};
-
 module.exports = {
   createPrescription,
   getPrescriptions,
@@ -163,6 +112,4 @@ module.exports = {
   getPrescriptionsByDoctor,
   updatePrescription,
   deletePrescription,
-  dispensePrescription,
-  returnPrescription,
 };

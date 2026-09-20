@@ -30,7 +30,20 @@ const prescriptionRoutes = require("./prescription.routes");
 const medicalRecordRoutes = require("./medicalRecord.routes");
 const billingRoutes = require("./billing.routes");
 const paymentRoutes = require("./payment.routes");
+const supplierRoutes = require("./supplier.routes");
+const surgeryroutes = require("./surgery.route");
+const bedroutes = require("./bed.route");
+const nursesroute = require("./nurses.route")
+const queueRoutes = require("./queue.route");
+const labTestRoutes = require("./labtest.route");
+const pharmacyRoutes = require("./pharmacy.route");
+const financeRoutes = require("./finance.routes");
+const assetRoutes = require("./asset.route");
+const operationTheaterRoutes = require("./operationTheater.routes");
 const inventoryRoutes = require("./inventory.routes");
+const purchaseOrderRoutes = require("./purchaseorder.route");
+const radiologyRoutes = require("./radiology.route");
+const insuranceClaimRoutes = require("./insuranceclaim.route");
 
 // =========================
 // Route Mounting
@@ -42,14 +55,12 @@ router.use("/doctors", doctorRoutes);
 
 router.use("/departments", departmentRoutes);
 
-// Patient routes now at /patients with REST paths
 router.use("/patients", patientRoutes);
 
 router.use("/", dashboardRoutes);
 
 router.use("/auth", authRoutes);
 
-// Appointment, prescription, medicalRecord routes use full paths internally
 router.use("/", appointmentRoutes);
 
 router.use("/", auditRoutes);
@@ -60,10 +71,40 @@ router.use("/", prescriptionRoutes);
 
 router.use("/", medicalRecordRoutes);
 
-router.use("/", inventoryRoutes);
-
 router.use("/billings", billingRoutes);
 
 router.use("/payments", paymentRoutes);
 
+router.use("/suppliers", supplierRoutes);
+
+router.use("/surgeries", surgeryroutes)
+
+router.use("/beds", bedroutes);
+
+// router.use("/nurses", nursesroute);
+
+router.use("/queue", queueRoutes);
+
+router.use("/lab-tests", labTestRoutes);
+
+router.use("/pharmacy", pharmacyRoutes);
+
+router.use("/finance", financeRoutes);
+
+router.use("/assets", assetRoutes);
+
+router.use("/operation-theater", operationTheaterRoutes);
+
+router.use("/inventory", inventoryRoutes);
+
+router.use("/purchase-orders", purchaseOrderRoutes);
+
+router.use("/radiology", radiologyRoutes);
+
+router.use("/insurance", insuranceClaimRoutes);
+
 module.exports = router;
+
+
+
+

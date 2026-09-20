@@ -10,70 +10,39 @@ const {
 
 const { validationMiddleware } = require("../middlewares/validation.middleware");
 const { createPatientValidator, updatePatientValidator, patientIdValidator } = require("../validators/patient.validator");
-const authMiddleware = require("../middlewares/auth.middleware");
-const authorizeRoles = require("../middlewares/role.middleware");
 
 const router = express.Router();
+
 const upload = require("../middlewares/upload.middleware");
 
 // =========================
-// Create Patient — admin, receptionist
+// Create Patient
 // =========================
-router.post(
-  "/",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist"),
-  upload.single("profileImage"),
-  createPatientValidator,
-  validationMiddleware,
-  createPatient
-);
+
+router.post("/createpatient", upload.single("profileImage"), createPatientValidator, validationMiddleware, createPatient);
 
 // =========================
-// Get All Patients — admin, receptionist, doctor, nurse
+// Get All Patients
 // =========================
-router.get(
-  "/",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist", "doctor", "nurse"),
-  getPatients
-);
+
+router.get("/getpatients", getPatients);
 
 // =========================
-// Get Patient By ID — admin, receptionist, doctor, nurse
+// Get Patient By ID
 // =========================
-router.get(
-  "/:id",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist", "doctor", "nurse"),
-  patientIdValidator,
-  validationMiddleware,
-  getPatientById
-);
+
+router.get("/getpatientby/:id", patientIdValidator, validationMiddleware, getPatientById);
 
 // =========================
-// Update Patient By ID — admin, receptionist
+// Update Patient By ID
 // =========================
-router.put(
-  "/:id",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist"),
-  upload.single("profileImage"),
-  updatePatientValidator,
-  validationMiddleware,
-  updatePatient
-);
+
+router.put("/updatepatientby/:id", upload.single("profileImage"), updatePatientValidator, validationMiddleware, updatePatient);
 
 // =========================
-// Delete Patient By ID — admin only
+// Delete Patient By ID
 // =========================
-router.delete(
-  "/:id",
-  authMiddleware,
-  authorizeRoles("admin"),
-  patientIdValidator,
-  validationMiddleware,
-  deletePatient
-);
+
+router.delete("/deletepatientby/:id", patientIdValidator, validationMiddleware, deletePatient);
 
 module.exports = router;

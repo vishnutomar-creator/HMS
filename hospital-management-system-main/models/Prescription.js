@@ -64,22 +64,53 @@ const prescriptionSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Links to a MedicalRecord — optional but strongly recommended
     recordId: {
       type: String,
       trim: true,
-      default: null,
+      default: "REC-101",
+    },
+
+    patient: {
+      type: String,
+      trim: true,
+    },
+
+    patientName: {
+      type: String,
+      trim: true,
+    },
+
+    medicineName: {
+      type: String,
+      trim: true,
+    },
+
+    dosage: {
+      type: String,
+      trim: true,
+    },
+
+    frequency: {
+      type: String,
+      trim: true,
+      default: "Once daily",
+    },
+
+    duration: {
+      type: String,
+      trim: true,
+    },
+
+    instructions: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     patientId: {
       type: mongoose.Schema.Types.Mixed,
       required: false,
       default: null,
-    },
-
-    patientName: {
-      type: String,
-      trim: true,
     },
 
     doctorId: {
@@ -104,9 +135,8 @@ const prescriptionSchema = new mongoose.Schema(
       default: [],
     },
 
-    // Structured medicines array — single source of truth
     medicines: {
-      type: [medicineSchema],
+      type: Array,
       default: [],
     },
 
@@ -122,31 +152,8 @@ const prescriptionSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Active", "Pending Dispense", "Dispensed", "Returned", "Completed", "Cancelled"],
-      default: "Pending Dispense",
+      default: "Active",
     },
-
-    dispensedAt: {
-      type: Date,
-      default: null,
-    },
-
-    dispensedBy: {
-      type: String,
-      default: null,
-    },
-
-    returnHistory: [
-      {
-        returnedAt: {
-          type: Date,
-          default: Date.now,
-        },
-        medicineName: String,
-        quantity: Number,
-        reason: String,
-      },
-    ],
   },
   {
     timestamps: true,

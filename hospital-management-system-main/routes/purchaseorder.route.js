@@ -1,0 +1,40 @@
+const express = require("express");
+
+const {
+    createPO,
+    getPOs,
+    getPOById,
+    getPOsBySupplier,
+    approvePO,
+    markOrdered,
+    receivePO,
+    cancelPO,
+    deletePO,
+} = require("../controllers/purchaseorder.controller");
+
+const { validationMiddleware } = require("../middlewares/validation.middleware");
+const {
+    createPOValidator,
+    idValidator,
+    supplierIdParamValidator,
+} = require("../validators/purchaseorder.validator");
+
+const authMiddleware = require("../middlewares/auth.middleware");
+const authorizeRoles = require("../middlewares/role.middleware");
+const { ROLES } = require("../constants/roles");
+
+const router = express.Router();
+
+router.use(authMiddleware, authorizeRoles(ROLES.ADMIN));
+
+router.post("/createpo", createPOValidator, validationMiddleware, createPO);
+router.get("/getpos", getPOs);
+router.get("/getposby/:id", idValidator, validationMiddleware, getPOById);
+router.get("/getposbysupplier/:supplierId", supplierIdParamValidator, getPOsBySupplier);
+router.patch("/approvepo/:id", idValidator, validationMiddleware, approvePO);
+router.patch("/markordered/:id", idValidator, validationMiddleware, markOrdered);
+router.patch("/receivepo/:id", idValidator, validationMiddleware, receivePO);
+router.patch("/cancelpo/:id", idValidator, validationMiddleware, cancelPO);
+router.delete("/deletepoby/:id", idValidator, validationMiddleware, deletePO);
+
+module.exports = router;

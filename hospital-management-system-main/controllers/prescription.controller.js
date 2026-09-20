@@ -171,50 +171,6 @@ const deletePrescription = async (
   }
 };
 
-// DISPENSE
-const dispensePrescription = async (req, res, next) => {
-  try {
-    const prescription = await prescriptionService.dispensePrescription(
-      req.params.id,
-      req.body.dispensedBy
-    );
-    return res.status(200).json({
-      success: true,
-      message: "Prescription dispensed successfully and inventory updated",
-      data: prescription,
-    });
-  } catch (error) {
-    if (error.insufficientStock) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-        insufficientStock: true,
-        details: error.details,
-      });
-    }
-    next(error);
-  }
-};
-
-// RETURN
-const returnPrescription = async (req, res, next) => {
-  try {
-    const { returnedItems, reason } = req.body;
-    const prescription = await prescriptionService.returnPrescription(
-      req.params.id,
-      returnedItems,
-      reason
-    );
-    return res.status(200).json({
-      success: true,
-      message: "Pharmacy return processed successfully and inventory stock restored",
-      data: prescription,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   createPrescription,
   getPrescriptions,
@@ -223,6 +179,4 @@ module.exports = {
   getPrescriptionsByDoctor,
   updatePrescription,
   deletePrescription,
-  dispensePrescription,
-  returnPrescription,
 };

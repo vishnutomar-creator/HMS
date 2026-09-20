@@ -15,54 +15,42 @@ const {
 } = require("../validators/doctor.validator");
 
 const { validationMiddleware } = require("../middlewares/validation.middleware");
-const authMiddleware = require("../middlewares/auth.middleware");
-const authorizeRoles = require("../middlewares/role.middleware");
 
 const router = express.Router();
 
-// Create Doctor — admin only
+// Create Doctor
 router.post(
   "/",
-  authMiddleware,
-  authorizeRoles("admin"),
   createDoctorValidator,
   validationMiddleware,
   createDoctor
 );
 
-// Get All Doctors — admin, receptionist, doctor, nurse
+// Get All Doctors
 router.get(
   "/",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist", "doctor", "nurse"),
   getDoctors
 );
 
-// Get Doctor By ID — admin, receptionist, doctor, nurse
+// Get Doctor By ID
 router.get(
   "/:id",
-  authMiddleware,
-  authorizeRoles("admin", "receptionist", "doctor", "nurse"),
   doctorIdValidator,
   validationMiddleware,
   getDoctorById
 );
 
-// Update Doctor — admin only
+// Update Doctor By ID
 router.put(
   "/:id",
-  authMiddleware,
-  authorizeRoles("admin"),
   updateDoctorValidator,
   validationMiddleware,
   updateDoctor
 );
 
-// Delete Doctor — admin only
+// Delete Doctor By ID
 router.delete(
   "/:id",
-  authMiddleware,
-  authorizeRoles("admin"),
   doctorIdValidator,
   validationMiddleware,
   deleteDoctor
