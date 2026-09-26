@@ -10,6 +10,8 @@ export default function EditDoctorPage() {
   const router = useRouter();
   const params = useParams();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [mongoId, setMongoId] = useState(null);
   const [doctor, setDoctor] = useState({
     name: "",
     email: "",
@@ -40,6 +42,7 @@ export default function EditDoctorPage() {
         }
 
         if (found) {
+          setMongoId(found._id || found.id || null);
           setDoctor({
             name: found.name || found.doctorName || "",
             email: found.email || "",
@@ -62,25 +65,31 @@ export default function EditDoctorPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      if (params?.id) {
-        await doctorAPI.updateDoctor(params.id, {
+      const idToUse = mongoId || params?.id;
+      if (idToUse) {
+        const availabilityMap = {
+          Available: "Available",
+          Unavailable: "Unavailable",
+          "On Leave": "On Leave",
+        };
+        await doctorAPI.updateDoctor(idToUse, {
           name: doctor.name,
           email: doctor.email,
           phone: doctor.phone,
-          department: doctor.department,
           specialization: doctor.specialization,
           experience: Number(doctor.experience) || undefined,
-          shift: doctor.shift,
-          availability: doctor.status === "Available" ? "Available" : "Unavailable",
+          availability: availabilityMap[doctor.status] || "Available",
         });
+        router.push("/doctors");
       }
     } catch (err) {
-      console.warn("Update doctor notice:", err.message);
+      console.error("Update doctor error:", err.message);
+      setError(err.message || "Failed to update doctor. Please try again.");
     } finally {
       setLoading(false);
-      router.push("/doctors");
     }
   };
 
@@ -95,6 +104,12 @@ export default function EditDoctorPage() {
           <p className="mt-1 text-sm text-[#7B8882] dark:text-[#87938E]">Doctor ID: {params.id}</p>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="rounded-2xl border border-[#E5E2D9] bg-white p-6 dark:border-white/10 dark:bg-[#17201D]">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -128,20 +143,11 @@ export default function EditDoctorPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Status</label>
+            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Availability</label>
             <select value={doctor.status} onChange={(e) => setDoctor((d) => ({ ...d, status: e.target.value }))} className={inputClass}>
               <option>Available</option>
-              <option>On Duty</option>
+              <option>Unavailable</option>
               <option>On Leave</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Shift</label>
-            <select value={doctor.shift} onChange={(e) => setDoctor((d) => ({ ...d, shift: e.target.value }))} className={inputClass}>
-              <option>Morning</option>
-              <option>Evening</option>
-              <option>Night</option>
             </select>
           </div>
         </div>
@@ -150,7 +156,7 @@ export default function EditDoctorPage() {
           <Link href="/doctors" className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#52615B] transition hover:bg-[#F1F3EF] dark:text-[#AAB6B0]">Cancel</Link>
           <button type="submit" disabled={loading} className="flex items-center gap-2 rounded-xl bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0B625C]">
             <Save size={16} />
-            {loading ? "Saving..." : "Update Doctor"}
+            {loading ? "Saving..." : "Update Doctor"}      
           </button>
         </div>
       </form>

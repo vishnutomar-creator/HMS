@@ -19,30 +19,30 @@ const upload = require("../middlewares/upload.middleware");
 // Create Patient
 // =========================
 
-router.post("/createpatient", upload.single("profileImage"), createPatientValidator, validationMiddleware, createPatient);
+router.post("/", upload.single("profileImage"), createPatientValidator, validationMiddleware, createPatient);
 
 // =========================
 // Get All Patients
 // =========================
 
-router.get("/getpatients", getPatients);
+router.get("/", getPatients);
 
 // =========================
 // Get Patient By ID
 // =========================
 
-router.get("/getpatientby/:id", patientIdValidator, validationMiddleware, getPatientById);
+router.get("/:id", patientIdValidator, validationMiddleware, getPatientById);
 
 // =========================
 // Update Patient By ID
 // =========================
 
-router.put("/updatepatientby/:id", upload.single("profileImage"), updatePatientValidator, validationMiddleware, updatePatient);
+router.put("/:id", upload.single("profileImage"), updatePatientValidator, validationMiddleware, updatePatient);
 
 // =========================
 // Delete Patient By ID
 // =========================
 
-router.delete("/deletepatientby/:id", patientIdValidator, validationMiddleware, deletePatient);
+router.delete("/:id", patientIdValidator, validationMiddleware, deletePatient);
 
 module.exports = router;

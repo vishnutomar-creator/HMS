@@ -91,7 +91,7 @@ const updatePrescription = async (
 
 // Delete (supports Mongo _id or rxId)
 const deletePrescription = async (id) => {
-  const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { $or: [{ _id: id }, { rxId: id }] };
+  const query = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { rxId: id };
   return await Prescription.findOneAndDelete(query);
 };
 

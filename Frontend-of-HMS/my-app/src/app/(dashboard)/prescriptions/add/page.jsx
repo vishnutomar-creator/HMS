@@ -190,12 +190,13 @@ export default function AddPrescriptionPage() {
 
     try {
       await prescriptionAPI.createPrescription(payload);
+      setLoading(false);
+      setSaved({ rxId, patient: form.patientName || "Patient" });
     } catch (err) {
-      console.warn("API create prescription notice:", err.message);
+      console.error("Create prescription error:", err.message);
+      setSubmitError(err.message || "Failed to save prescription. Please try again.");
+      setLoading(false);
     }
-
-    setLoading(false);
-    setSaved({ rxId, patient: form.patientName || "Patient" });
   };
 
   // ── Saved confirmation screen ──────────────────────────────────────────

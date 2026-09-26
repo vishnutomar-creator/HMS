@@ -76,8 +76,8 @@ const createDoctorValidator = [
 
 const updateDoctorValidator = [
   param("id")
-    .isMongoId()
-    .withMessage("Invalid doctor ID"),
+    .notEmpty()
+    .withMessage("Doctor ID is required"),
 
   body("email")
     .optional()
@@ -96,8 +96,8 @@ const updateDoctorValidator = [
 
   body("department")
     .optional()
-    .isMongoId()
-    .withMessage("Invalid department ID"),
+    .notEmpty()
+    .withMessage("Department cannot be empty"),
 
   body("consultationFee")
     .optional()

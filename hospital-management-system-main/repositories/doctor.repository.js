@@ -37,10 +37,11 @@ const getDoctorByRegistrationNumber = async (registrationNumber) => {
 
 // Update doctor
 const updateDoctor = async (id, doctorData) => {
-  return await Doctor.findByIdAndUpdate(id, doctorData, {
-    new: true,
-    runValidators: true,
-  })
+  return await Doctor.findByIdAndUpdate(
+    id,
+    { $set: doctorData },
+    { new: true }
+  )
     .populate("userId", "email role")
     .populate("department", "name");
 };

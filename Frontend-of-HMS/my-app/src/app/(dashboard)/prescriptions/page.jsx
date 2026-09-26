@@ -35,6 +35,7 @@ export default function PrescriptionsPage() {
           const med = Array.isArray(p.medicines) && p.medicines.length > 0 ? p.medicines[0] : {};
           return {
             prescriptionId: p.rxId || p.prescriptionId || p._id || p.id,
+            mongoId: p._id || p.id,
             recordId: p.recordId || "REC-101",
             patient: p.patient || p.patientName || p.patientId?.name || "Patient",
             medicineName: p.medicineName || med.name || "Amlodipine 5mg",
@@ -60,14 +61,16 @@ export default function PrescriptionsPage() {
     fetchPrescriptions();
   }, []);
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (p) => {
     if (!confirm("Are you sure you want to delete this prescription?")) return;
+    const idToDelete = p.mongoId || p.prescriptionId;
     try {
-      await prescriptionAPI.deletePrescription(id);
+      await prescriptionAPI.deletePrescription(idToDelete);
+      setPrescriptions((prev) => prev.filter((x) => x.prescriptionId !== p.prescriptionId));
+      setOpenMenuId(null);
     } catch (err) {
-      console.warn("Delete prescription notice:", err.message);
-    } finally {
-      setPrescriptions((prev) => prev.filter((p) => p.prescriptionId !== id));
+      console.error("Delete prescription error:", err.message);
+      alert(`Failed to delete prescription: ${err.message}`);
       setOpenMenuId(null);
     }
   };
@@ -272,7 +275,7 @@ export default function PrescriptionsPage() {
                             Edit
                           </Link>
                           <button
-                            onClick={() => handleDelete(p.prescriptionId)}
+                            onClick={() => handleDelete(p)}
                             className="block w-full px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                           >
                             Delete
