@@ -33,7 +33,7 @@ import {
   updateQueueStatus,
   saveConsultation,
 } from "../../../utils/opd";
-import { prescriptionAPI } from "../../../services/api";
+import { prescriptionAPI, medicalRecordAPI, labAPI, patientAPI } from "../../../services/api";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -317,64 +317,122 @@ export default function ConsultationPage() {
     const prescriptionId = `RX-${Date.now()}`;
     const labOrderId     = `LO-${Date.now()}`;
 
-    const prescriptionData = {
-      id:          prescriptionId,
-      prescriptionId,
-      appointmentId: entry?.id,
-      patient:     entry?.patient,
-      patientId:   entry?.patientId,
-      doctor:      entry?.doctor,
-      department:  entry?.department,
-      date:        new Date().toISOString().slice(0, 10),
-      drugs:       drugs.filter((d) => d.name.trim()),
-      diagnosis:   consult.diagnosis,
-      notes:       consult.notes,
-      status:      "Active",
+    // Map clinical shorthand → backend enum
+    const FREQ_MAP = {
+      "OD":  "once_daily",
+      "BD":  "twice_daily",
+      "TDS": "three_times_daily",
+      "QID": "four_times_daily",
+      "SOS": "as_needed",
+      "HS":  "once_daily",
+      "AC":  "once_daily",
+      "PC":  "once_daily",
     };
 
-    const labOrderData = {
-      id:        labOrderId,
-      orderId:   labOrderId,
-      appointmentId: entry?.id,
-      patient:   entry?.patient,
-      patientId: entry?.patientId,
-      doctor:    entry?.doctor,
-      date:      new Date().toISOString().slice(0, 10),
-      tests:     labTests.filter((t) => t.test.trim()),
-      diagnosis: consult.diagnosis,
-      status:    "Pending",
-    };
+    const validDrugs = drugs.filter((d) => d.name.trim());
+    const validTests = labTests.filter((t) => t.test.trim());
 
-    // Save prescription to backend API
+    // ── 1. Create prescription in MongoDB ─────────────────────────────
     try {
-      if (prescriptionData.drugs.length > 0) {
+      if (validDrugs.length > 0) {
         await prescriptionAPI.createPrescription({
-          rxId: prescriptionId,
-          patientId: entry?.patientId || undefined,
-          patientName: entry?.patient || undefined,
-          doctorId: entry?.doctorId || undefined,
-          doctorName: entry?.doctor || undefined,
-          diagnosis: consult.diagnosis,
-          medicines: prescriptionData.drugs.map((d) => ({
-            name: d.name,
-            dosage: d.dosage || "1 tablet",
-            frequency: d.frequency || "once_daily",
-            duration: d.duration || "5 days",
-            instructions: d.timing || "",
+          rxId:        prescriptionId,
+          patientId:   entry?.patientId   || undefined,
+          patientName: entry?.patient     || undefined,
+          doctorId:    entry?.doctorId    || undefined,
+          doctorName:  entry?.doctor      || undefined,
+          diagnosis:   consult.diagnosis  || "General Consultation",
+          advice:      consult.notes      || "",
+          followUpDate: consult.followUpDate || undefined,
+          medicines: validDrugs.map((d) => ({
+            name:         d.name,
+            dosage:       d.dose || "1 tablet",       // ← d.dose (form field), NOT d.dosage
+            frequency:    FREQ_MAP[d.frequency] || "once_daily",
+            timing:       "anytime",
+            duration:     d.duration || "5 days",
+            instructions: d.instructions || "",
           })),
           status: "Pending Dispense",
         });
       }
     } catch (err) {
-      console.warn("API create prescription notice:", err.message);
+      console.warn("Prescription API notice:", err.message);
     }
 
-    // Save consultation data + mark queue complete
+    // ── 2. Create lab orders in MongoDB (one per test) ─────────────────
+    const labMongoIds = [];
+    if (validTests.length > 0) {
+      if (entry?.patientId && entry?.doctorId) {
+        for (const t of validTests) {
+          try {
+            const res = await labAPI.orderLabTest({
+              patientId:    entry.patientId,
+              doctorId:     entry.doctorId,
+              patientName:  entry.patient  || "",
+              doctorName:   entry.doctor   || "",
+              testName:     t.test,
+              testCategory: "Other",
+              priority:     t.priority || "Routine",
+              notes:        t.instructions || "",
+            });
+            if (res?.data?._id) labMongoIds.push(res.data._id);
+          } catch (err) {
+            console.error(
+              `❌ Lab order FAILED for "${t.test}":`,
+              err.message,
+              "\n  patientId:", entry?.patientId,
+              "\n  doctorId:",  entry?.doctorId
+            );
+          }
+        }
+      } else {
+        // IDs missing — log clearly so developer can diagnose booking flow
+        console.error(
+          "❌ Lab orders NOT saved — missing patientId or doctorId in queue entry.",
+          "\n  patientId:", entry?.patientId || "(empty)",
+          "\n  doctorId:",  entry?.doctorId  || "(empty)",
+          "\n  patient:",   entry?.patient,
+          "\n  doctor:",    entry?.doctor,
+          "\n  Fix: ensure the appointment booking stores the MongoDB _id for both patient and doctor."
+        );
+      }
+    }
+
+    // ── 3. Create medical record in MongoDB ────────────────────────────
+    try {
+      if (entry?.patientId && entry?.doctorId && consult.diagnosis) {
+        await medicalRecordAPI.createMedicalRecord({
+          patientId:     entry.patientId,
+          doctorId:      entry.doctorId,
+          patientName:   entry.patient  || "",
+          doctorName:    entry.doctor   || "",
+          appointmentId: entry?.id      || undefined,
+          recordType:    "consultation",
+          diagnosis:     consult.diagnosis,
+          chiefComplaint: consult.chiefComplaint || "",
+          symptoms:      consult.chiefComplaint ? [consult.chiefComplaint] : [],
+          doctorNotes:   [consult.notes, consult.examination].filter(Boolean).join("\n"),
+          treatment:     consult.notes || "",
+          followUpDate:  consult.followUpDate || undefined,
+          status:        "active",
+        });
+      } else if (consult.diagnosis) {
+        console.error(
+          "❌ Medical record NOT saved — missing patientId or doctorId.",
+          "\n  patientId:", entry?.patientId || "(empty)",
+          "\n  doctorId:",  entry?.doctorId  || "(empty)"
+        );
+      }
+    } catch (err) {
+      console.error("Medical record API error:", err.message, err);
+    }
+
+    // ── 4. Save locally to OPD queue + mark Completed ─────────────────
     saveConsultation(tokenId, {
       vitals,
-      consultation:   consult,
-      prescription:   { id: prescriptionId, drugs: prescriptionData.drugs },
-      labOrders:      { id: labOrderId, tests: labOrderData.tests },
+      consultation: consult,
+      prescription: { id: prescriptionId, drugs: validDrugs },
+      labOrders:    { id: labOrderId, tests: validTests, mongoIds: labMongoIds },
     });
 
     setSaving(false);

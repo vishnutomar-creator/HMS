@@ -42,6 +42,7 @@ const assetRoutes = require("./asset.route");
 const operationTheaterRoutes = require("./operationTheater.routes");
 const inventoryRoutes = require("./inventory.routes");
 const purchaseOrderRoutes = require("./purchaseorder.route");
+const admissionRoutes = require("./admission.route");
 const radiologyRoutes = require("./radiology.route");
 const insuranceClaimRoutes = require("./insuranceclaim.route");
 const authMiddleware = require("../middlewares/auth.middleware");
@@ -87,6 +88,8 @@ router.use("/suppliers", supplierRoutes);
 router.use("/surgeries", surgeryroutes)
 
 router.use("/beds", bedroutes);
+
+router.use("/admissions", admissionRoutes);
 
 // router.use("/nurses", nursesroute);
 
