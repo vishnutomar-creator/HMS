@@ -30,7 +30,9 @@ const createPatient = async (req, res, next) => {
 // Get All Patients
 const getPatients = async (req, res, next) => {
   try {
-    const patients = await patientService.getPatients();
+    const patients = req.user.role === "patient"
+      ? [await patientService.getPatientByUserId(req.user.userId)].filter(Boolean)
+      : await patientService.getPatients();
 
     res.status(200).json({
       success: true,
@@ -49,6 +51,13 @@ const getPatientById = async (req, res, next) => {
       req.params.id
     );
 
+    if (req.user.role === "patient" && String(patient?.userId?._id || patient?.userId) !== String(req.user.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only access your own patient record",
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "Patient fetched successfully",
@@ -62,6 +71,13 @@ const getPatientById = async (req, res, next) => {
 // Update Patient
 const updatePatient = async (req, res, next) => {
   try {
+    const existingPatient = await patientService.getPatientById(req.params.id);
+    if (req.user.role === "patient" && String(existingPatient?.userId?._id || existingPatient?.userId) !== String(req.user.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only update your own patient record",
+      });
+    }
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "hms/patients",

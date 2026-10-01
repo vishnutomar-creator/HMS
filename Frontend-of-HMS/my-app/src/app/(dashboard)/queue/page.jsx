@@ -204,7 +204,7 @@ export default function QueuePage() {
   const [statusFilter, setStatusFilter] = useState("Active"); // Active | All | Completed
   const [refreshKey,   setRefreshKey]   = useState(0);
 
-  const isDoctor = activeRole === "Doctor";
+  const isDoctor = activeRole === "DOCTOR";
 
   const loadQueue = useCallback(() => {
     const raw = getTodayQueue(isDoctor ? doctorFilter || undefined : undefined);

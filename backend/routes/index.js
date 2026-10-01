@@ -44,6 +44,8 @@ const inventoryRoutes = require("./inventory.routes");
 const purchaseOrderRoutes = require("./purchaseorder.route");
 const radiologyRoutes = require("./radiology.route");
 const insuranceClaimRoutes = require("./insuranceclaim.route");
+const authMiddleware = require("../middlewares/auth.middleware");
+const authorizeApiAccess = require("../middlewares/apiAuthorization.middleware");
 
 // =========================
 // Route Mounting
@@ -60,6 +62,11 @@ router.use("/patients", patientRoutes);
 router.use("/", dashboardRoutes);
 
 router.use("/auth", authRoutes);
+
+// Every business endpoint below this point requires a verified backend
+// session. Route-specific role middleware adds narrower permissions.
+router.use(authMiddleware);
+router.use(authorizeApiAccess);
 
 router.use("/", appointmentRoutes);
 

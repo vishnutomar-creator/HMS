@@ -12,38 +12,21 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore and validate existing login session from backend
+  // The backend owns the HttpOnly session cookie. The browser cannot read or
+  // overwrite it, so the role is always fetched from the authenticated session.
   useEffect(() => {
     async function restoreSession() {
       try {
-        const storedUser = localStorage.getItem("hms_user");
-        const storedToken = localStorage.getItem("hms_token");
-
-        if (storedToken) {
-          setToken(storedToken);
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
-          // Validate token with backend /api/auth/me
-          try {
-            const meRes = await authAPI.getMe();
-            if (meRes.success && meRes.data) {
-              setUser(meRes.data);
-              localStorage.setItem("hms_user", JSON.stringify(meRes.data));
-            }
-          } catch (err) {
-            console.warn("Backend token validation check failed:", err.message);
-          }
+        const meRes = await authAPI.getMe();
+        if (meRes.success && meRes.data) {
+          setUser(meRes.data);
         }
-      } catch (error) {
-        console.error("Auth restore error:", error);
-        localStorage.removeItem("hms_user");
-        localStorage.removeItem("hms_token");
+      } catch {
+        // An absent or expired cookie is an unauthenticated state, not a
+        // frontend-authentication failure.
         setUser(null);
-        setToken(null);
       } finally {
         setLoading(false);
       }
@@ -58,16 +41,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await authAPI.login({ email, password });
       if (response.success && response.data) {
-        const { token: accessToken, user: userData } = response.data;
-        setUser(userData || { email });
-        setToken(accessToken);
-
-        if (userData) {
-          localStorage.setItem("hms_user", JSON.stringify(userData));
-        }
-        if (accessToken) {
-          localStorage.setItem("hms_token", accessToken);
-        }
+        setUser(response.data.user);
         return response;
       }
       throw new Error(response.message || "Login failed");
@@ -88,21 +62,24 @@ export function AuthProvider({ children }) {
   };
 
   // Logout
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-
-    localStorage.removeItem("hms_user");
-    localStorage.removeItem("hms_token");
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      setUser(null);
+    }
   };
 
-  const isAuthenticated = !!user || !!token;
+  const role = user?.role ?? null;
+  const permissions = user?.permissions ?? [];
+  const isAuthenticated = !!user;
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
+        role,
+        permissions,
         loading,
         isAuthenticated,
         login,

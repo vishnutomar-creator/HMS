@@ -8,18 +8,18 @@
 // ---------------------------------------------------------------------------
 /** All system roles as a frozen constant — use these keys everywhere. */
 export const ROLES = Object.freeze({
-  SUPER_ADMIN:       "SuperAdmin",
-  ADMIN:             "Admin",
-  DOCTOR:            "Doctor",
-  RECEPTIONIST:      "Receptionist",
-  NURSE:             "Nurse",
-  PHARMACIST:        "Pharmacist",
-  BILLING_EXECUTIVE: "BillingExecutive",
-  LAB_TECHNICIAN:    "LabTechnician",
-  PATIENT:           "Patient",
+  SUPER_ADMIN:       "SUPER_ADMIN",
+  ADMIN:             "ADMIN",
+  DOCTOR:            "DOCTOR",
+  RECEPTIONIST:      "RECEPTIONIST",
+  NURSE:             "NURSE",
+  PHARMACIST:        "PHARMACIST",
+  BILLING_EXECUTIVE: "BILLING_EXECUTIVE",
+  LAB_TECHNICIAN:    "LAB_TECHNICIAN",
+  PATIENT:           "PATIENT",
 });
 
-/** Ordered list of all roles (used in the dev role-switcher dropdown). */
+/** Ordered list of supported application roles. */
 export const ALL_ROLES = Object.values(ROLES);
 
 // ---------------------------------------------------------------------------

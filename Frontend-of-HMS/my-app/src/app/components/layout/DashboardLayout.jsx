@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "../../context/AuthContext";
+import { dashboardPath, isRouteAllowed } from "../../utils/authorization";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import MobileSidebar from "./MobileSidebar";
@@ -11,20 +13,26 @@ import Footer from "./Footer";
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
+  const pathname = usePathname();
+  const { user, role, loading } = useAuth();
 
   useEffect(() => {
-    // Check for authentication token — redirect to login if missing
-    const token = localStorage.getItem("hms_token");
-    if (!token) {
+    if (loading) return;
+    if (!user) {
       router.replace("/login");
-    } else {
-      setAuthChecked(true);
+      return;
     }
-  }, [router]);
+    if (pathname === "/dashboard") {
+      router.replace(dashboardPath(role));
+      return;
+    }
+    if (!isRouteAllowed(role, pathname)) {
+      router.replace(dashboardPath(role));
+    }
+  }, [loading, pathname, role, router, user]);
 
   // Show nothing while checking auth to avoid flash of dashboard
-  if (!authChecked) {
+  if (loading || !user || !isRouteAllowed(role, pathname)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F7F4ED]">
         <div className="flex flex-col items-center gap-3">

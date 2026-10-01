@@ -3,6 +3,7 @@ const express = require("express");
 const {
   register,
   login,
+  logout,
   getMe,
 } = require("../controllers/auth.controller");
 
@@ -28,6 +29,8 @@ router.post(
   validateLogin,
   login
 );
+
+router.post("/logout", logout);
 
 // Current User
 router.get(

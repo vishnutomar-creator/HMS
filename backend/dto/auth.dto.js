@@ -4,7 +4,9 @@ const registerDTO = (data) => {
     email: data.email,
     phone: data.phone || "",
     password: data.password,
-    role: data.role || "patient",
+    // Public registration can only create patients. Staff accounts must be
+    // provisioned through an authenticated administration workflow.
+    role: "patient",
   };
 };
 
@@ -16,12 +18,13 @@ const loginDTO = (data) => {
 };
 
 const userResponseDTO = (user) => {
+  const role = String(user.role || "").toUpperCase();
   return {
     id: user._id,
     name: user.name,
     email: user.email,
     phone: user.phone,
-    role: user.role,
+    role,
     isActive: user.isActive,
     createdAt: user.createdAt,
   };

@@ -8,20 +8,21 @@ const authMiddleware = (
   next
 ) => {
   try {
-    const authHeader =
-      req.headers.authorization;
+    const authHeader = req.headers.authorization;
+    const cookieToken = req.cookies?.hms_session;
 
-    if (!authHeader) {
+    if (!authHeader && !cookieToken) {
       return res.status(401).json({
         success: false,
         message: "Authorization token required",
       });
     }
 
-    const token =
-      authHeader.startsWith("Bearer ")
+    const bearerToken = authHeader?.startsWith("Bearer ")
         ? authHeader.split(" ")[1]
         : null;
+
+    const token = bearerToken || cookieToken;
 
     if (!token) {
       return res.status(401).json({

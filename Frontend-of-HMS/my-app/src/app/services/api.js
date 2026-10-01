@@ -1,45 +1,17 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-const getAuthToken = async () => {
-  if (typeof window !== "undefined") {
-    let token = localStorage.getItem("hms_token");
-    if (!token) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "admin@hms.com", password: "password123" }),
-        });
-        const d = await res.json();
-        token = d?.data?.token || d?.token;
-        if (token) {
-          localStorage.setItem("hms_token", token);
-          if (d.data?.user) localStorage.setItem("hms_user", JSON.stringify(d.data.user));
-        }
-      } catch (_) {}
-    }
-    return token;
-  }
-  return null;
-};
-
 async function apiFetch(endpoint, options = {}) {
-  const token = await getAuthToken();
-
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   const data = await response.json().catch(() => ({}));
@@ -70,6 +42,8 @@ export const authAPI = {
     }),
 
   getMe: () => apiFetch("/auth/me"),
+
+  logout: () => apiFetch("/auth/logout", { method: "POST" }),
 };
 
 export const userAPI = {

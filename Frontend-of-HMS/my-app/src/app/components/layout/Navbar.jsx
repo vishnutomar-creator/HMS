@@ -3,167 +3,19 @@
 import {
   Bell,
   ChevronDown,
-  FlaskConical,
   Menu,
   Moon,
   Search,
   Settings,
-  ShieldCheck,
   Sun,
-  UserCog,
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import { useRole } from "../../hooks/usePermission";
-import { ALL_ROLES, ROLE_META } from "../../utils/constant";
-
-// ---------------------------------------------------------------------------
-// Dev Role Switcher
-// ---------------------------------------------------------------------------
-function DevRoleSwitcher() {
-  const { activeRole, setRole } = useRole();
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  const meta = ROLE_META[activeRole] ?? { label: activeRole, color: "#0F766E", bgColor: "#0F766E1A" };
-
-  // Close on outside click
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-
-      {/* Trigger pill */}
-      <button
-        id="dev-role-switcher-btn"
-        onClick={() => setOpen((v) => !v)}
-        title="Dev Role Switcher — switch active role for testing"
-        className="
-          flex items-center gap-1.5
-          rounded-xl border px-3 py-1.5
-          text-xs font-semibold
-          transition-all duration-150
-          hover:opacity-90 active:scale-95
-        "
-        style={{
-          borderColor: meta.color + "55",
-          backgroundColor: meta.bgColor,
-          color: meta.color,
-        }}
-      >
-        {/* Blinking dot — signals "dev mode" */}
-        <span
-          className="inline-block h-1.5 w-1.5 animate-pulse rounded-full"
-          style={{ backgroundColor: meta.color }}
-        />
-
-        <span className="hidden sm:inline">{meta.label}</span>
-
-        <ChevronDown
-          size={12}
-          className={`transition-transform ${open ? "rotate-180" : ""}`}
-          style={{ color: meta.color }}
-        />
-      </button>
-
-
-      {/* Dropdown */}
-      {open && (
-        <div
-          className="
-            absolute right-0 top-11 z-50
-            w-56 overflow-hidden
-            rounded-2xl border border-[#DDD9CE]
-            bg-white shadow-2xl
-
-            dark:border-white/10
-            dark:bg-[#1C2723]
-          "
-        >
-          {/* Header */}
-          <div className="border-b border-[#EEECE5] px-4 py-3 dark:border-white/10">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#91A19A]">
-              <FlaskConical size={10} />
-              Dev Role Switcher
-            </p>
-            <p className="mt-0.5 text-[10px] text-[#B0BBB5] dark:text-[#71817B]">
-              For testing only — not real auth
-            </p>
-          </div>
-
-          {/* Role list */}
-          <div className="p-1.5">
-            {ALL_ROLES.map((role) => {
-              const m = ROLE_META[role];
-              const isActive = role === activeRole;
-
-              return (
-                <button
-                  key={role}
-                  id={`role-switch-${role.toLowerCase().replace(/\s/g, "-")}`}
-                  onClick={() => {
-                    setRole(role);
-                    setOpen(false);
-                  }}
-                  className={`
-                    flex w-full items-center gap-3 rounded-xl px-3 py-2.5
-                    text-left text-xs font-medium
-                    transition-all
-                    ${isActive
-                      ? "bg-[#F7F4ED] dark:bg-white/[0.06]"
-                      : "hover:bg-[#F7F4ED] dark:hover:bg-white/[0.04]"
-                    }
-                  `}
-                >
-                  {/* Color swatch */}
-                  <span
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: m.bgColor }}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: m.color }}
-                    />
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="font-semibold"
-                      style={{ color: isActive ? m.color : undefined }}
-                    >
-                      {m.label}
-                    </p>
-                    <p className="truncate text-[10px] text-[#91A19A]">
-                      {m.description}
-                    </p>
-                  </div>
-
-                  {/* Active check */}
-                  {isActive && (
-                    <ShieldCheck
-                      size={13}
-                      style={{ color: m.color, flexShrink: 0 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
+import { ROLE_META } from "../../utils/constant";
+import { useAuth } from "../../context/AuthContext";
+import { useRouter } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Navbar
@@ -174,6 +26,8 @@ export default function Navbar({ onMenuClick }) {
 
   const { theme, toggleTheme } = useTheme();
   const { activeRole } = useRole();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const meta = ROLE_META[activeRole] ?? { label: activeRole };
 
   // Close profile dropdown on outside click
@@ -264,13 +118,6 @@ export default function Navbar({ onMenuClick }) {
         >
           <Search size={19} />
         </button>
-
-
-        {/* =================================================
-            DEV ROLE SWITCHER
-        ================================================== */}
-
-        <DevRoleSwitcher />
 
 
         {/* Divider */}
@@ -385,7 +232,7 @@ export default function Navbar({ onMenuClick }) {
             {/* Avatar */}
 
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0F766E] text-xs font-bold text-white">
-              {(meta.label ?? "SA")
+              {(user?.name ?? "User")
                 .split(" ")
                 .map((w) => w[0])
                 .join("")
@@ -399,11 +246,11 @@ export default function Navbar({ onMenuClick }) {
             <div className="hidden text-left lg:block">
 
               <p className="text-xs font-bold text-[#17201D] dark:text-white">
-                {meta.label}
+                {user?.name ?? "Authenticated user"}
               </p>
 
               <p className="text-[10px] text-[#7B8882] dark:text-[#87938E]">
-                {meta.description}
+                {meta.label}
               </p>
 
             </div>
@@ -457,11 +304,11 @@ export default function Navbar({ onMenuClick }) {
               <div className="border-b border-[#EEECE5] px-3 py-3 dark:border-white/10">
 
                 <p className="text-sm font-bold text-[#17201D] dark:text-white">
-                  {meta.label}
+                  {user?.name ?? "Authenticated user"}
                 </p>
 
                 <p className="mt-0.5 text-xs text-[#7B8882] dark:text-[#87938E]">
-                  {meta.description}
+                  {meta.label}
                 </p>
 
                 {/* Role pill in dropdown */}
@@ -481,6 +328,7 @@ export default function Navbar({ onMenuClick }) {
               {/* Profile */}
 
               <button
+                onClick={() => router.push("/profile")}
                 className="
                   mt-1 w-full
                   rounded-xl px-3 py-2.5
@@ -501,6 +349,7 @@ export default function Navbar({ onMenuClick }) {
               {/* Settings */}
 
               <button
+                onClick={() => router.push("/settings")}
                 className="
                   w-full
                   rounded-xl px-3 py-2.5
@@ -521,6 +370,10 @@ export default function Navbar({ onMenuClick }) {
               {/* Logout */}
 
               <button
+                onClick={async () => {
+                  await logout();
+                  router.replace("/login");
+                }}
                 className="
                   w-full
                   rounded-xl px-3 py-2.5

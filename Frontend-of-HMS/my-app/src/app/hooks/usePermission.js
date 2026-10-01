@@ -4,30 +4,29 @@
  * MediCare HMS — Permission Hooks
  *
  * Public hooks that components and pages should use.
- * All hooks read the active role from RoleContext so they automatically
- * react when the dev role-switcher changes roles.
+ * All hooks read the role from the authenticated backend session.
  *
  * Usage:
  *   const canCreate = usePermission("patient.create");
  *   const { "lab.view": canViewLab, "lab.order.create": canOrderLab } = usePermissions(["lab.view", "lab.order.create"]);
- *   const { activeRole, setRole } = useRole();
+ *   const { role } = useRole();
  */
 
 import { useMemo } from "react";
-import { useRoleContext } from "../context/RoleContext";
+import { useAuth } from "../context/AuthContext";
 import { hasPermission, hasAnyPermission, hasAllPermissions } from "../utils/permission";
 
 // ---------------------------------------------------------------------------
 // useRole
 // ---------------------------------------------------------------------------
 /**
- * Returns the active role and the setter for switching roles.
+ * Returns the authenticated role. It is intentionally read-only.
  *
- * @returns {{ activeRole: string, setRole: (role: string) => void, resetRole: () => void }}
+ * @returns {{ activeRole: string | null, role: string | null, hydrated: boolean }}
  */
 export function useRole() {
-  const { activeRole, setRole, resetRole, hydrated } = useRoleContext();
-  return { activeRole, setRole, resetRole, hydrated };
+  const { role, loading } = useAuth();
+  return { activeRole: role, role, hydrated: !loading };
 }
 
 // ---------------------------------------------------------------------------
@@ -47,7 +46,7 @@ export function useRole() {
  * }
  */
 export function usePermission(permission) {
-  const { activeRole } = useRoleContext();
+  const { role: activeRole } = useAuth();
 
   return useMemo(
     () => hasPermission(activeRole, permission),
@@ -70,7 +69,7 @@ export function usePermission(permission) {
  * // { "billing.create": true, "billing.delete": false }
  */
 export function usePermissions(permissions = []) {
-  const { activeRole } = useRoleContext();
+  const { role: activeRole } = useAuth();
 
   return useMemo(() => {
     return Object.fromEntries(
@@ -90,7 +89,7 @@ export function usePermissions(permissions = []) {
  * @returns {boolean}
  */
 export function useHasAnyPermission(permissions = []) {
-  const { activeRole } = useRoleContext();
+  const { role: activeRole } = useAuth();
 
   return useMemo(
     () => hasAnyPermission(activeRole, permissions),
@@ -109,7 +108,7 @@ export function useHasAnyPermission(permissions = []) {
  * @returns {boolean}
  */
 export function useHasAllPermissions(permissions = []) {
-  const { activeRole } = useRoleContext();
+  const { role: activeRole } = useAuth();
 
   return useMemo(
     () => hasAllPermissions(activeRole, permissions),

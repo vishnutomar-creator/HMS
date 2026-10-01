@@ -1,8 +1,7 @@
 import "./globals.css";
-import { ThemeProvider } from "../app/context/ThemeContext";
-import { AuthProvider } from "../app/context/AuthContext";
-import { NotificationProvider } from "../app/context/NotificationContext";
-import { RoleProvider } from "../app/context/RoleContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import { AuthProvider } from "./context/AuthContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
 
 export const metadata = {
@@ -16,11 +15,9 @@ export default function RootLayout({ children }) {
       <body>
         <ThemeProvider>
           <AuthProvider>
-            <RoleProvider>
-              <NotificationProvider>
-                {children}
-              </NotificationProvider>
-            </RoleProvider>
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

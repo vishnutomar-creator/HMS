@@ -23,10 +23,15 @@ async function main() {
 
     // 2. Default accounts
     const defaultAccounts = [
-      { name: 'System Admin', email: 'admin@hms.com', password: 'password123', role: 'admin', phone: '1234567890' },
-      { name: 'Dr. John Doe', email: 'doctor@hms.com', password: 'password123', role: 'doctor', phone: '9876543210' },
-      { name: 'Receptionist Sarah', email: 'receptionist@hms.com', password: 'password123', role: 'receptionist', phone: '5551234567' },
-      { name: 'Patient Alice', email: 'patient@hms.com', password: 'password123', role: 'patient', phone: '9998887776' }
+      { name: 'System Super Admin', email: 'superadmin@test.com', password: 'password123', role: 'super_admin', phone: '1234567890' },
+      { name: 'System Admin', email: 'admin@test.com', password: 'password123', role: 'admin', phone: '1234567891' },
+      { name: 'Dr. Rahul Sharma', email: 'doctor@test.com', password: 'password123', role: 'doctor', phone: '9876543210' },
+      { name: 'Receptionist Sarah', email: 'receptionist@test.com', password: 'password123', role: 'receptionist', phone: '5551234567' },
+      { name: 'Nurse Maya', email: 'nurse@test.com', password: 'password123', role: 'nurse', phone: '5551234568' },
+      { name: 'Pharmacist Amit', email: 'pharmacist@test.com', password: 'password123', role: 'pharmacist', phone: '5551234569' },
+      { name: 'Billing Executive Neha', email: 'billing@test.com', password: 'password123', role: 'billing_executive', phone: '5551234570' },
+      { name: 'Lab Technician Vikram', email: 'lab@test.com', password: 'password123', role: 'lab_technician', phone: '5551234571' },
+      { name: 'Patient Aditi Sharma', email: 'patient@test.com', password: 'password123', role: 'patient', phone: '9998887776' }
     ];
 
     for (const acc of defaultAccounts) {
@@ -43,6 +48,8 @@ async function main() {
         console.log(`Created ${acc.role.toUpperCase()} user: ${acc.email}`);
       } else {
         user.password = hashedPassword;
+        user.role = acc.role;
+        user.isActive = true;
         await user.save();
         console.log(`Updated ${acc.role.toUpperCase()} user: ${acc.email}`);
       }

@@ -40,6 +40,7 @@ import { useRouter } from "next/navigation";
 import { useRole } from "../../hooks/usePermission";
 import { filterMenuGroups } from "../../utils/permission";
 import { ROLE_META, SIDEBAR_GROUPS } from "../../utils/constant";
+import { dashboardPath, isRouteAllowed } from "../../utils/authorization";
 
 // ---------------------------------------------------------------------------
 // Menu group definitions
@@ -260,7 +261,12 @@ export default function Sidebar({ mobile = false, onClose }) {
   const { activeRole } = useRole();
 
   // Filter menu groups based on the active role
-  const visibleGroups = filterMenuGroups(activeRole, menuGroups);
+  const visibleGroups = filterMenuGroups(activeRole, menuGroups)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isRouteAllowed(activeRole, item.href)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const handleLogout = async () => {
     await logout();
@@ -286,7 +292,7 @@ export default function Sidebar({ mobile = false, onClose }) {
 
   const isActive = (href) => {
     if (href === "/dashboard") {
-      return pathname === "/dashboard";
+      return pathname === dashboardPath(activeRole);
     }
 
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -317,7 +323,7 @@ export default function Sidebar({ mobile = false, onClose }) {
 
       <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-white/10 px-5">
 
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href={dashboardPath(activeRole)} className="flex items-center gap-3">
 
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0F766E]">
             <Hospital size={22} />
@@ -435,7 +441,7 @@ export default function Sidebar({ mobile = false, onClose }) {
           <div className="min-w-0 flex-1">
 
             <p className="truncate text-sm font-semibold text-white">
-              {user?.name || "Super Admin"}
+              {user?.name || "Authenticated user"}
             </p>
 
             {/* Role badge */}
