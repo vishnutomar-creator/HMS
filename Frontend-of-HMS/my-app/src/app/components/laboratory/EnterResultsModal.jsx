@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, FileCheck, CheckCircle2 } from "lucide-react";
+import { X, FileCheck, CheckCircle2, Loader2 } from "lucide-react";
 import { labStore } from "../../services/labStore";
 
 export default function EnterResultsModal({ order, onClose, onSuccess }) {
@@ -9,55 +9,55 @@ export default function EnterResultsModal({ order, onClose, onSuccess }) {
     value: "",
     normalRange: "Standard reference range",
     interpretation: "Normal",
-    technician: "Tech. Ramesh Gupta",
+    technician: "",
     remarks: "",
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   if (!order) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    labStore.enterResults(order.id, {
-      value: form.value || "Normal limits",
-      normalRange: form.normalRange,
-      interpretation: form.interpretation,
-      technician: form.technician,
-      remarks: form.remarks,
-    });
-
-    if (onSuccess) onSuccess();
-    onClose();
+    setLoading(true);
+    setError("");
+    try {
+      await labStore.enterResults(order.id, {
+        value: form.value || "Normal limits",
+        normalRange: form.normalRange,
+        interpretation: form.interpretation,
+        technician: form.technician,
+        remarks: form.remarks,
+      });
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to submit results. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:border dark:border-white/10 dark:bg-[#17201D]">
-        
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-[#EEECE5] pb-4 dark:border-white/10">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
               <FileCheck size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#17201D] dark:text-white">
-                Enter Diagnostic Results
-              </h2>
+              <h2 className="text-base font-bold text-[#17201D] dark:text-white">Enter Diagnostic Results</h2>
               <p className="text-xs text-[#7B8882] font-semibold dark:text-[#87938E]">
-                Order {order.id} · {order.testType}
+                Order {String(order.id).slice(-8)} · {order.testType}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-xl p-1 text-[#87938E] hover:bg-[#F1F3EF] dark:hover:bg-white/10"
-          >
+          <button onClick={onClose} className="rounded-xl p-1 text-[#87938E] hover:bg-[#F1F3EF] dark:hover:bg-white/10">
             <X size={18} />
           </button>
         </div>
 
-        {/* Patient & Sample Card */}
         <div className="mt-4 rounded-xl bg-[#FAFAF7] p-3 text-xs dark:bg-[#202B27]">
           <div className="flex items-center justify-between">
             <p className="font-bold text-[#17201D] dark:text-white">{order.patientName}</p>
@@ -68,12 +68,15 @@ export default function EnterResultsModal({ order, onClose, onSuccess }) {
           <p className="text-[#87938E] mt-0.5">Specimen: {order.sample?.specimenType || "Blood"}</p>
         </div>
 
-        {/* Form */}
+        {error && (
+          <div className="mt-3 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Primary Observed Result / Value
-            </label>
+            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Primary Observed Result / Value</label>
             <input
               required
               type="text"
@@ -85,9 +88,7 @@ export default function EnterResultsModal({ order, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Normal Reference Range
-            </label>
+            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Normal Reference Range</label>
             <input
               type="text"
               value={form.normalRange}
@@ -99,41 +100,31 @@ export default function EnterResultsModal({ order, onClose, onSuccess }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-                Clinical Interpretation
-              </label>
+              <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Clinical Interpretation</label>
               <select
                 value={form.interpretation}
                 onChange={(e) => setForm({ ...form, interpretation: e.target.value })}
                 className={inputClass}
               >
                 <option value="Normal">Normal</option>
-                <option value="High">High</option>
-                <option value="Low">Low</option>
+                <option value="Abnormal">Abnormal</option>
                 <option value="Critical">Critical</option>
               </select>
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-                Technician Name
-              </label>
-              <select
+              <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Technician Name</label>
+              <input
+                type="text"
                 value={form.technician}
                 onChange={(e) => setForm({ ...form, technician: e.target.value })}
+                placeholder="e.g. Tech. John Smith"
                 className={inputClass}
-              >
-                <option>Tech. Ramesh Gupta</option>
-                <option>Tech. Suresh Kumar</option>
-                <option>Tech. Ananya Roy</option>
-              </select>
+              />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">
-              Technical Notes / Remarks
-            </label>
+            <label className="mb-1 block text-xs font-semibold text-[#52615B] dark:text-[#AAB6B0]">Technical Notes / Remarks</label>
             <textarea
               rows={2}
               value={form.remarks}
@@ -144,29 +135,20 @@ export default function EnterResultsModal({ order, onClose, onSuccess }) {
           </div>
 
           <p className="text-[11px] text-[#7B8882] italic dark:text-[#87938E]">
-            * Submitting results moves this order to <strong className="text-indigo-600 dark:text-indigo-400">RESULT_READY</strong> status for Pathologist Verification.
+            * Submitting results saves to MongoDB and moves this order to{" "}
+            <strong className="text-indigo-600 dark:text-indigo-400">RESULT_READY</strong> status for Pathologist Verification.
           </p>
 
-          {/* Actions */}
           <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#EEECE5] pt-4 dark:border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl px-4 py-2 text-xs font-semibold text-[#52615B] hover:bg-[#F1F3EF] dark:text-[#AAB6B0] dark:hover:bg-white/10"
-            >
+            <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-semibold text-[#52615B] hover:bg-[#F1F3EF] dark:text-[#AAB6B0] dark:hover:bg-white/10">
               Cancel
             </button>
-
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
-            >
-              <CheckCircle2 size={15} />
-              Submit Results for Verification
+            <button type="submit" disabled={loading} className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+              {loading ? "Saving to DB..." : "Submit Results for Verification"}
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

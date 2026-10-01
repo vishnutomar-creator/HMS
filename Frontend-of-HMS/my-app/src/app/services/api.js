@@ -1,29 +1,37 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+// ─── Fresh login helper ───────────────────────────────────────────────────────
+async function freshLogin() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "admin@hms.com", password: "password123" }),
+    });
+    const d = await res.json();
+    const token = d?.data?.token || d?.token;
+    if (token) {
+      localStorage.setItem("hms_token", token);
+      if (d.data?.user) localStorage.setItem("hms_user", JSON.stringify(d.data.user));
+    }
+    return token || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// ─── Get token, auto-login if missing ────────────────────────────────────────
 const getAuthToken = async () => {
   if (typeof window !== "undefined") {
-    let token = localStorage.getItem("hms_token");
-    if (!token) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "admin@hms.com", password: "password123" }),
-        });
-        const d = await res.json();
-        token = d?.data?.token || d?.token;
-        if (token) {
-          localStorage.setItem("hms_token", token);
-          if (d.data?.user) localStorage.setItem("hms_user", JSON.stringify(d.data.user));
-        }
-      } catch (_) {}
-    }
-    return token;
+    const token = localStorage.getItem("hms_token");
+    if (token) return token;
+    return await freshLogin();
   }
   return null;
 };
 
-async function apiFetch(endpoint, options = {}) {
+// ─── Core fetch wrapper with automatic 401 token-refresh ─────────────────────
+async function apiFetch(endpoint, options = {}, _isRetry = false) {
   const token = await getAuthToken();
 
   const headers = {
@@ -37,12 +45,19 @@ async function apiFetch(endpoint, options = {}) {
 
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
+  const response = await fetch(url, { ...options, headers });
   const data = await response.json().catch(() => ({}));
+
+  // If the token is stale/expired and this is the first attempt, clear it and retry
+  if (response.status === 401 && !_isRetry) {
+    localStorage.removeItem("hms_token");
+    localStorage.removeItem("hms_user");
+    const newToken = await freshLogin();
+    if (newToken) {
+      // Retry the original request once with the fresh token
+      return apiFetch(endpoint, options, true);
+    }
+  }
 
   if (!response.ok) {
     const error = new Error(data.message || `Request failed with status ${response.status}`);
@@ -52,6 +67,7 @@ async function apiFetch(endpoint, options = {}) {
 
   return data;
 }
+
 
 // ==========================================
 // 1. AUTH & USER API
@@ -340,4 +356,66 @@ export const notificationAPI = {
 // ==========================================
 export const auditAPI = {
   getLogs: () => apiFetch("/audit-logs"),
+};
+
+// ==========================================
+// 13. LAB TESTS API  (/lab-tests)
+// ==========================================
+export const labAPI = {
+  // GET all lab tests
+  getLabTests: () => apiFetch("/lab-tests/getlabtests"),
+
+  // GET pending lab tests (status=Ordered)
+  getPendingLabTests: () => apiFetch("/lab-tests/getpendinglabtests"),
+
+  // GET single lab test by ID
+  getLabTestById: (id) => apiFetch(`/lab-tests/getlabtestby/${id}`),
+
+  // GET lab tests by patient ID
+  getLabTestsByPatient: (patientId) => apiFetch(`/lab-tests/getlabtestsbypatient/${patientId}`),
+
+  // POST create / order a new lab test
+  orderLabTest: (data) =>
+    apiFetch("/lab-tests/orderlabtest", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // PATCH collect sample (moves to SampleCollected)
+  collectSample: (id) =>
+    apiFetch(`/lab-tests/collectsample/${id}`, {
+      method: "PATCH",
+    }),
+
+  // PATCH start processing (moves to InProgress)
+  startProcessing: (id) =>
+    apiFetch(`/lab-tests/startprocessing/${id}`, {
+      method: "PATCH",
+    }),
+
+  // PATCH submit result (moves to Completed)
+  submitResult: (id, data) =>
+    apiFetch(`/lab-tests/submitresult/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  // PATCH verify result
+  verifyResult: (id, verifiedBy) =>
+    apiFetch(`/lab-tests/verifyresult/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ verifiedBy }),
+    }),
+
+  // PATCH cancel lab test
+  cancelLabTest: (id) =>
+    apiFetch(`/lab-tests/cancellabtest/${id}`, {
+      method: "PATCH",
+    }),
+
+  // DELETE lab test
+  deleteLabTest: (id) =>
+    apiFetch(`/lab-tests/deletelabtestby/${id}`, {
+      method: "DELETE",
+    }),
 };

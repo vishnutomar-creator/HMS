@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -66,6 +66,8 @@ export default function PatientDetailPage() {
   const [medRecords, setMedRecords] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [admissions, setAdmissions] = useState([]);
+  const [verifiedLabReports, setVerifiedLabReports] = useState([]);
+  const [pendingLabOrders, setPendingLabOrders] = useState([]);
 
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [medLoading, setMedLoading] = useState(false);
@@ -125,6 +127,24 @@ export default function PatientDetailPage() {
     loadPatient();
   }, [params]);
 
+  // Load lab reports whenever patient changes
+  useEffect(() => {
+    if (!patient) return;
+    async function loadLabReports() {
+      try {
+        const [verified, pending] = await Promise.all([
+          labStore.getVerifiedReportsForPatient(patient.name),
+          labStore.getPendingOrdersForPatient(patient.name),
+        ]);
+        setVerifiedLabReports(Array.isArray(verified) ? verified : []);
+        setPendingLabOrders(Array.isArray(pending) ? pending : []);
+      } catch (e) {
+        console.warn("Lab reports:", e.message);
+      }
+    }
+    loadLabReports();
+  }, [patient]);
+
   // Load history when switching to history tab
   useEffect(() => {
     if (tab !== "history" || !patient) return;
@@ -159,6 +179,7 @@ export default function PatientDetailPage() {
               (r) =>
                 r.patientId === patient.mongoId ||
                 r.patientId?._id === patient.mongoId ||
+                String(r.patientId) === String(patient.mongoId) ||
                 r.patientId === patient.id
             ));
           }
@@ -194,7 +215,7 @@ export default function PatientDetailPage() {
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("hms_token") : null;
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const res = await fetch(`${apiBase}/admissions`, {
+        const res = await fetch(`${apiBase}/admissions/getadmissions`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -203,6 +224,7 @@ export default function PatientDetailPage() {
             (a) =>
               a.patientId === patient.mongoId ||
               a.patientId?._id === patient.mongoId ||
+              String(a.patientId) === String(patient.mongoId) ||
               a.patientName === patient.name
           ));
         }
@@ -229,8 +251,7 @@ export default function PatientDetailPage() {
   }
 
   const initials = patient.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const verifiedLabReports = labStore.getVerifiedReportsForPatient(patient.name);
-  const pendingLabOrders = labStore.getPendingOrdersForPatient(patient.name);
+  // verifiedLabReports and pendingLabOrders are loaded asynchronously via useEffect above
 
   return (
     <div className="space-y-6">

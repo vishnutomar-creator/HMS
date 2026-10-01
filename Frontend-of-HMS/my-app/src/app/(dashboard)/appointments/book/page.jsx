@@ -58,6 +58,7 @@ export default function BookAppointmentPage() {
     patientId:  "",
     patientUhid:"",
     doctor:     "",
+    doctorId:   "",
     department: DEPARTMENTS[3], // General Medicine default
     date:       new Date().toISOString().slice(0, 10),
     time:       "10:00",
@@ -81,8 +82,10 @@ export default function BookAppointmentPage() {
         if (pResp.success && Array.isArray(pResp.data)) {
           pResp.data.forEach((p) => {
             const name = p.name || p.patientName || p.userId?.name;
+            // Prefer MongoDB _id (ObjectId) over patientId which may be a UHID string
+            const mongoId = p._id || p.id || p.patientId || "";
             if (name && !pList.find((x) => x.name === name)) {
-              pList.push({ name, id: p.patientId || p._id || p.id || "", uhid: p.uhid || p.patientId || "" });
+              pList.push({ name, id: mongoId, uhid: p.uhid || p.patientId || "" });
             }
           });
         }
@@ -94,7 +97,10 @@ export default function BookAppointmentPage() {
         if (dResp.success && Array.isArray(dResp.data)) {
           dResp.data.forEach((d) => {
             const name = d.name || d.doctorName || d.userId?.name;
-            if (name && !dList.includes(name)) dList.push(name);
+            // Prefer MongoDB _id (ObjectId) over any other id field
+            const mongoId = d._id || d.id || "";
+            if (name && !dList.find((x) => x.name === name))
+              dList.push({ name, id: mongoId });
           });
         }
       } catch { /* ignore */ }
@@ -109,7 +115,8 @@ export default function BookAppointmentPage() {
         patient:    pList[0]?.name || "",
         patientId:  pList[0]?.id   || "",
         patientUhid:pList[0]?.uhid || "",
-        doctor:     dList[0] || "",
+        doctor:     dList[0]?.name || "",
+        doctorId:   dList[0]?.id   || "",
       }));
     }
     loadData();
@@ -119,13 +126,19 @@ export default function BookAppointmentPage() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "patient") {
-      // Update patient + resolve id/uhid from options
       const found = patientOptions.find((p) => p.name === value);
       setForm((prev) => ({
         ...prev,
         patient:     value,
         patientId:   found?.id   ?? "",
         patientUhid: found?.uhid ?? "",
+      }));
+    } else if (name === "doctor") {
+      const found = doctorOptions.find((d) => d.name === value);
+      setForm((prev) => ({
+        ...prev,
+        doctor:   value,
+        doctorId: found?.id ?? "",
       }));
     } else {
       setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
@@ -169,9 +182,10 @@ export default function BookAppointmentPage() {
         appointmentId: aptId,
         token,
         patient:      finalPatient,
-        patientId:    form.patientId   || aptId,
+        patientId:    form.patientId   || "",
         patientUhid:  form.patientUhid || "",
         doctor:       finalDoctor,
+        doctorId:     form.doctorId    || "",
         department:   form.department,
         date:         form.date,
         time:         form.time,
@@ -302,7 +316,7 @@ export default function BookAppointmentPage() {
               <input required type="text" name="doctor" value={form.doctor} onChange={handleChange} placeholder="e.g. Dr. Ankit Sharma" className={inputClass} />
             ) : (
               <select name="doctor" value={form.doctor} onChange={handleChange} className={inputClass}>
-                {doctorOptions.map((d) => <option key={d}>{d}</option>)}
+                {doctorOptions.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
               </select>
             )}
           </div>

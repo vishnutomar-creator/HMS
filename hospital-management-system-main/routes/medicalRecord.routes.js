@@ -32,12 +32,8 @@ router.get(
   getMedicalRecords
 );
 
-router.get(
-  "/medical-records/:id",
-  authMiddleware,
-  getMedicalRecordById
-);
-
+// Specific sub-routes MUST come before the generic /:id route
+// to prevent Express treating "patient" / "doctor" as an id
 router.get(
   "/medical-records/patient/:patientId",
   authMiddleware,
@@ -48,6 +44,12 @@ router.get(
   "/medical-records/doctor/:doctorId",
   authMiddleware,
   getMedicalRecordsByDoctor
+);
+
+router.get(
+  "/medical-records/:id",
+  authMiddleware,
+  getMedicalRecordById
 );
 
 router.put(
